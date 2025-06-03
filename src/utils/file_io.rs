@@ -77,13 +77,14 @@ pub fn import_from_png(file_path: &str) -> Result<SKIDImage, String> {
         pixel_data[y as usize][x as usize] = color;
     }
 
-    Ok(
-        SKIDImage::from_data_size(
-            SKIDSizeVector2 { 
-                width: width as usize, 
-                height: height as usize 
-            },
-            pixel_data,
-        )
-    )
+    let skid_image = SKIDImage::from_data_size(
+        SKIDSizeVector2 { 
+            width: width as usize, 
+            height: height as usize 
+        },
+        pixel_data,
+    );
+
+
+    Ok(skid_image)
 }

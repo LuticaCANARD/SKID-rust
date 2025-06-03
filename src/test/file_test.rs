@@ -4,7 +4,7 @@ use crate::utils::file_io::export_to_png;
 use crate::utils::{self, gpu_opt};
 use std::fs;
 
-const TEST_OUTPUT: &str = "output/test_output.png";
+const TEST_OUTPUT: &str = "output/test_output2.png";
 
 #[test]
 pub fn test_file_write() {
@@ -16,11 +16,10 @@ pub fn test_file_write() {
     );
 
 
-    // let new_image = gpu_opt::launch::<cubecl::cuda::CudaRuntime>(
-    //     &Default::default(),
-    //     image,
-    // );
-    let new_image = image;
+    let new_image = gpu_opt::launch::<cubecl::cuda::CudaRuntime>(
+        &Default::default(),
+        image,
+    );
 
     
     // Define the file path
