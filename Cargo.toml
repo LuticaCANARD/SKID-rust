@@ -4,9 +4,16 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-cubecl = { version = "0.5.0", features = ["default", "cuda"] } # Cubecl 라이브러리 의존성
+cubecl = { version = "0.5.0", features = ["default"] } # Cubecl 라이브러리 의존성
 bytemuck = "1"
+image = { version = "0.25.6", optional = true } # 이미지 처리 라이브러리, 선택적 의존성
 
 [lib]
 name = "skid_rust_backend" # 라이브러리 파일 이름에 영향을 줍니다.
 crate-type = ["cdylib"]
+
+[features]
+default = ["use_cuda", "use_image"] # 기본 기능은 CUDA와 이미지 기능을 포함합니다.
+use_cuda = ["cubecl/cuda"]
+use_image = ["image"] # 이미지 기능을 사용하려면 이 기능을 활성화해야 합니다.
+
