@@ -7,13 +7,19 @@ pub extern "C" fn skid_color_new(r: f32, g: f32, b: f32, a: f32) -> SKIDColor {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn skid_color_to_f32_array(color: SKIDColor) -> [f32;4] {
-    color.to_f32_array() // 내부적으로 SKIDColor의 to_u32 메서드 사용
+pub extern "C" fn skid_color_to_f32_array(color: SKIDColor, out_array: *mut f32) {
+    assert!(!out_array.is_null());
+    let arr = color.to_f32_array();
+    unsafe {
+        std::ptr::copy_nonoverlapping(arr.as_ptr(), out_array, 4);
+    }
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn skid_color_from_f32_array(color_val: [f32;4]) -> SKIDColor {
-    SKIDColor::from_f32_array(color_val) // 내부적으로 SKIDColor의 from_u32 메서드 사용
+pub extern "C" fn skid_color_from_f32_array(color_val: *const f32) -> SKIDColor {
+     assert!(!color_val.is_null());
+    let slice = unsafe { std::slice::from_raw_parts(color_val, 4) };
+    SKIDColor::from_f32_array(slice.try_into().unwrap())
 }
 
 // 연산자 오버로딩에 대한 FFI 함수들
