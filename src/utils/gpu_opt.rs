@@ -25,7 +25,6 @@ pub fn launch<R: Runtime>(
     let width = image_input.get_size().width;
     let height = image_input.get_size().height;
     let output_a_handle = client.empty(input_flat.len() * core::mem::size_of::<f32>());
-    let handle_count = 1024; // Number of handles to use for the kernel
     let max_threads = R::max_cube_count();
     let block_x = (width + max_threads.0 as usize - 1) / max_threads.0 as usize;
     let threads_x = if width < max_threads.0 as usize { width } else { max_threads.0 as usize };
