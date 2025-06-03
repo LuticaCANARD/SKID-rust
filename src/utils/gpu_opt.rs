@@ -14,25 +14,23 @@ pub fn launch<R: Runtime>(
     image_input: SKIDImage
 ) -> SKIDImage {
     let client = R::client(device);
-    let input: &Vec<Vec<SKIDColor>> = image_input.get_data();
-    
-    let input_flat: Vec<f32> = input.iter()
-        .flat_map(|row| row.iter().flat_map(|color| color.to_f32_array()))
-        .collect();
-    let input_handle = client.create(bytemuck::cast_slice(&input_flat));
-    let pixel_count = input_flat.len() / 4; // Assuming each color has 4 components (RGBA)
+    let input = image_input.get_1d_data_as_f32();
+    let input_handle = client.create(bytemuck::cast_slice(&input));
+    let pixel_count = input.len() / 4; // Assuming each color has 4 components (RGBA)
 
     let width = image_input.get_size().width;
+    let w_u32 = width as u32;
     let height = image_input.get_size().height;
-    let output_a_handle = client.empty(input_flat.len() * core::mem::size_of::<f32>());
-    let max_threads = R::max_cube_count();
-    let block_x = (width + max_threads.0 as usize - 1) / max_threads.0 as usize;
-    let threads_x = if width < max_threads.0 as usize { width } else { max_threads.0 as usize };
+    let h_u32 = height as u32;
+    let output_a_handle = client.empty(input.len() * core::mem::size_of::<f32>());
+    let (max_thread_x, max_thread_y, _max_thread_z) = R::max_cube_count();
+    let block_x = (w_u32 + max_thread_x - 1) / max_thread_x;
+    let threads_x = if w_u32 < max_thread_x { w_u32  } else { max_thread_x };
 
-    let block_y = (height + max_threads.1 as usize - 1) / max_threads.1 as usize;
-    let threads_y = if height < max_threads.1 as usize { height } else { max_threads.1 as usize };
+    let block_y = (h_u32 + max_thread_y - 1) / max_thread_y;
+    let threads_y = if h_u32 < max_thread_y { h_u32 } else { max_thread_y };
 
-    println!("Launching normalize with runtime: {}", input_flat.len());
+    println!("Launching normalize with runtime: {}", input.len());
     unsafe {
         norm_test::launch_unchecked::<f32, R>(
             &client,

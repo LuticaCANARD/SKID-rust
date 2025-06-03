@@ -1,4 +1,5 @@
 use crate::model::{skid_color::SKIDColor};
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SKIDSizeVector2 {
     pub width: usize,
@@ -120,5 +121,11 @@ impl SKIDImage {
         let width = (pixel_count as f64).sqrt() as usize;
         let height = pixel_count / width;
         SKIDImage::from_1d_data(SKIDSizeVector2 { width, height }, data)
+    }
+    pub fn get_1d_data(&self) -> Vec<SKIDColor> {
+        self.data.iter().flat_map(|row| row.iter().cloned()).collect()
+    }
+    pub fn get_1d_data_as_f32(&self) -> Vec<f32> {
+        self.data.iter().flat_map(|row| row.iter().flat_map(|color| color.to_f32_array())).collect()
     }
 }

@@ -11,8 +11,8 @@ pub struct SKIDColor {
 
 impl SKIDColor {
     pub const SKID_U8_ARRAY_BYTE_SIZE:usize = 4; // 4 bytes per channel (RGBA)
-    pub const SKID_U8_ARRAY_RESOLUTION:usize = 1; // 1 byte per channel
-    pub const SKID_U8_ARRAY_BYTE_SIZE_TOTAL:usize = Self::SKID_U8_ARRAY_BYTE_SIZE * Self::SKID_U8_ARRAY_RESOLUTION; // 4 channels * 1 byte per channel (RGBA)
+    pub const SKID_ARRAY_RESOLUTION:usize = 1; // 1 byte per channel
+    pub const SKID_U8_ARRAY_BYTE_SIZE_TOTAL:usize = Self::SKID_U8_ARRAY_BYTE_SIZE * Self::SKID_ARRAY_RESOLUTION; // 4 channels * 1 byte per channel (RGBA)
     pub const SKID_F32_ARRAY_BYTE_SIZE:usize = 16; // 4 channels * 4 bytes per channel (RGBA)
     
     pub fn new(r: f32, g: f32, b: f32, a: f32) -> Self {

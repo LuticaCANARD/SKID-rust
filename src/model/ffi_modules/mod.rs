@@ -17,7 +17,7 @@ pub extern "C" fn skid_color_to_f32_array(color: SKIDColor, out_array: *mut f32)
 
 #[unsafe(no_mangle)]
 pub extern "C" fn skid_color_from_f32_array(color_val: *const f32) -> SKIDColor {
-     assert!(!color_val.is_null());
+    assert!(!color_val.is_null());
     let slice = unsafe { std::slice::from_raw_parts(color_val, 4) };
     SKIDColor::from_f32_array(slice.try_into().unwrap())
 }
@@ -47,8 +47,6 @@ pub extern "C" fn skid_color_div_color(c1: SKIDColor, c2: SKIDColor) -> SKIDColo
 pub extern "C" fn skid_color_mul_f32(color: SKIDColor, scalar: f32) -> SKIDColor {
     color * scalar // Rust의 Mul<f32> 트레잇 구현 사용
 }
-
-
 
 #[unsafe(no_mangle)]
 pub extern "C" fn skid_vector3_new(x: f32, y: f32, z: f32) -> SKIDVector3 {
@@ -92,3 +90,5 @@ pub extern "C" fn skid_vector3_div_f32(v: SKIDVector3, scalar: f32) -> SKIDVecto
 pub extern "C" fn skid_vector3_neg(v: SKIDVector3) -> SKIDVector3 {
     -v // Rust 내부의 Neg 트레잇 사용
 }
+
+pub mod skid_image_ffi;
