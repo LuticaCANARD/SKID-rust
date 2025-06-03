@@ -2,18 +2,18 @@ use crate::model::{skid_color::SKIDColor, skid_vector3::SKIDVector3};
 
 
 #[unsafe(no_mangle)]
-pub extern "C" fn skid_color_new(r: u8, g: u8, b: u8, a: u8) -> SKIDColor {
+pub extern "C" fn skid_color_new(r: f32, g: f32, b: f32, a: f32) -> SKIDColor {
     SKIDColor::new(r, g, b, a)
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn skid_color_to_u32(color: SKIDColor) -> u32 {
-    color.to_u32() // 내부적으로 SKIDColor의 to_u32 메서드 사용
+pub extern "C" fn skid_color_to_f32_array(color: SKIDColor) -> [f32;4] {
+    color.to_f32_array() // 내부적으로 SKIDColor의 to_u32 메서드 사용
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn skid_color_from_u32(color_val: u32) -> SKIDColor {
-    SKIDColor::from_u32(color_val)
+pub extern "C" fn skid_color_from_f32_array(color_val: [f32;4]) -> SKIDColor {
+    SKIDColor::from_f32_array(color_val) // 내부적으로 SKIDColor의 from_u32 메서드 사용
 }
 
 // 연산자 오버로딩에 대한 FFI 함수들
@@ -35,11 +35,6 @@ pub extern "C" fn skid_color_mul_color(c1: SKIDColor, c2: SKIDColor) -> SKIDColo
 #[unsafe(no_mangle)]
 pub extern "C" fn skid_color_div_color(c1: SKIDColor, c2: SKIDColor) -> SKIDColor {
     c1 / c2 // Rust의 Div<SKIDColor> 트레잇 구현 사용
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn skid_color_mul_u8(color: SKIDColor, scalar: u8) -> SKIDColor {
-    color * scalar // Rust의 Mul<u8> 트레잇 구현 사용
 }
 
 #[unsafe(no_mangle)]

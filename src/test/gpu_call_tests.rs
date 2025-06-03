@@ -1,21 +1,8 @@
 
-// use super::*;
-// use crate::gpu_call;
 
-// #[test]
-// fn test_gpu_call() {
-//     let result = gpu_call(2, 3);
-//     assert_eq!(result, 5);
-// }
-
-// #[test]
-// fn test_gpu_call_with_negative() {
-//     let result = gpu_call(-2, 3);
-//     assert_eq!(result, 1);
-// }
-
-// #[test]
-// fn test_gpu_call_with_zero() {
-//     let result = gpu_call(0, 3);
-//     assert_eq!(result, 3);
-// }
+#[test]
+fn gpu_call_tests() {
+    // This test is a placeholder to ensure that the module is included in the build.
+    // Actual GPU call tests should be implemented here.
+    assert!(true, "GPU call tests module is included.");
+}
