@@ -23,6 +23,15 @@ impl SKIDImage {
             SKIDSizeVector2 { width, height }
         }
     }
+    pub fn new_with_color(width: usize, height: usize, color: SKIDColor) -> Self {
+        let data = vec![
+            vec![color; width as usize];
+            height as usize
+        ];
+        SKIDImage { width, height, data, len: (width * height) as usize, size:
+            SKIDSizeVector2 { width, height }
+        }
+    }
     pub fn from_1d_data(size:SKIDSizeVector2,  data: Vec<SKIDColor>) -> Self {
         let width = size.width;
         let height = size.height;
@@ -95,6 +104,9 @@ impl SKIDImage {
     }
     pub fn to_byte_array(&self) -> Vec<u8> {
         self.data.iter().flat_map(|row| row.iter().flat_map(|color| color.to_u8_array())).collect()
+    }
+    pub fn get_data(&self) -> &Vec<Vec<SKIDColor>> {
+        &self.data
     }
     pub fn from_raw_bytes(bytes: &[u8]) -> Self {
         if bytes.len() % SKIDColor::SKID_U8_ARRAY_BYTE_SIZE_TOTAL != 0 {

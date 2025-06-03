@@ -1,92 +1,57 @@
-use cubecl::{comptime, cube, prelude::{Array, ArrayArg, Erf, Float, Line, ScalarArg, Sequence, ABSOLUTE_POS}, Runtime};
+use cubecl::prelude::*;
 
 use crate::model::{skid_color::SKIDColor, skid_image::SKIDImage};
-use cubecl::frontend::CompilationArg;
-use cubecl::prelude::FloatExpand;
-#[cube(launch_unchecked)]
-fn action<F:Float>(
-    input:&Array<Line<F>>, 
-    input_value:F,
-    output:&mut Array<Line<F>>
-) {
-    if ABSOLUTE_POS < input.len() {
 
-        output[ABSOLUTE_POS] = action_add_const(input[ABSOLUTE_POS],
-            input_value
-        );
+#[cube(launch_unchecked)]
+fn norm_test<F: Float>(input: &Array<F>, output_a: &mut Array<F>) {
+    if ABSOLUTE_POS < input.len() {
+        output_a[ABSOLUTE_POS] = F::normalize(input[ABSOLUTE_POS]);
     }
 }
 
-#[cube]
-fn action_add_const<F: Float>(x: Line<F>,constant:F) -> Line<F> {
-    let line = Line::<F>::new(constant);
-    x + line
-}
-/**
- * pub fn launch<R: Runtime>(device: &R::Device) {
+pub fn launch<R: Runtime>(
+    device: &R::Device,
+    image_input: SKIDImage
+) -> SKIDImage {
     let client = R::client(device);
-    let input = &[-1., 0., 1., 5.];
-    let vectorization = 4;
-    let output_handle = client.empty(input.len() * core::mem::size_of::<f32>());
-    let input_handle = client.create(f32::as_bytes(input));
+    let input: &Vec<Vec<SKIDColor>> = image_input.get_data();
+    
+    let input_flat: Vec<f32> = input.iter()
+        .flat_map(|row| row.iter().flat_map(|color| color.to_f32_array()))
+        .collect();
+    let input_handle = client.create(bytemuck::cast_slice(&input_flat));
+    let pixel_count = input_flat.len() / 4; // Assuming each color has 4 components (RGBA)
 
+    let width = image_input.get_size().width;
+    let height = image_input.get_size().height;
+    let output_a_handle = client.empty(input_flat.len() * core::mem::size_of::<f32>());
+    let handle_count = 1024; // Number of handles to use for the kernel
+    let max_threads = R::max_cube_count();
+    let block_x = (width + max_threads.0 as usize - 1) / max_threads.0 as usize;
+    let threads_x = if width < max_threads.0 as usize { width } else { max_threads.0 as usize };
+
+    let block_y = (height + max_threads.1 as usize - 1) / max_threads.1 as usize;
+    let threads_y = if height < max_threads.1 as usize { height } else { max_threads.1 as usize };
+
+    println!("Launching normalize with runtime: {}", input_flat.len());
     unsafe {
-        gelu_array::launch_unchecked::<f32, R>(
+        norm_test::launch_unchecked::<f32, R>(
             &client,
-            CubeCount::Static(1, 1, 1),
-            CubeDim::new(input.len() as u32 / vectorization, 1, 1),
-            ArrayArg::from_raw_parts::<f32>(&input_handle, input.len(), vectorization as u8),
-            ArrayArg::from_raw_parts::<f32>(&output_handle, input.len(), vectorization as u8),
+            CubeCount::Static(threads_x as u32, threads_y as u32, 1),
+            CubeDim::new(block_x as u32, block_y as u32, 1),
+            ArrayArg::from_raw_parts::<f32>(&input_handle, pixel_count, 4),
+            ArrayArg::from_raw_parts::<f32>(&output_a_handle, pixel_count, 4),
         )
     };
 
-    let bytes = client.read_one(output_handle.binding());
+    let bytes = client.read_one(output_a_handle.binding());
     let output = f32::from_bytes(&bytes);
 
-    // Should be [-0.1587,  0.0000,  0.8413,  5.0000]
-    println!("Executed gelu with runtime {:?} => {output:?}", R::name());
+    let output_colors: Vec<SKIDColor> = output.chunks(4)
+        .map(|chunk| SKIDColor::from_f32_array(chunk.try_into().unwrap()))
+        .collect();
+    SKIDImage::from_1d_data(
+        image_input.get_size(), 
+        output_colors
+    )
 }
- */
-pub fn launch_apu_action_for_add_const<R:Runtime>(
-    device: &R::Device,
-    input_image: SKIDImage,
-    input_value: f32
-) -> SKIDImage {
-    use crate::utils::gpu_opt::action::launch_unchecked;
-    let client = R::client(device);
-    let input_data = input_image.to_byte_array();
-    let output_handle = client.empty(input_image.get_u8_byte_len()); 
-    let input_handle = client.create(&input_data);
-    let image_size = input_image.get_size();
-    let height = image_size.height as u32;
-    let width = image_size.width as u32;
-    let input_len = input_image.len();
-    unsafe {
-        launch_unchecked::<f32, R>(
-            &client,
-            cubecl::CubeCount::Static(1, 1, 1),
-            cubecl::CubeDim::new(width, height, 1),
-            ArrayArg::from_raw_parts::<u32>(
-                &input_handle, 
-                input_len.clone(), 
-                SKIDColor::SKID_U8_ARRAY_RESOLUTION as u8
-            ),
-            ScalarArg::from(cubecl::frontend::ScalarArg { elem: input_value }),
-            ArrayArg::from_raw_parts::<u32>(
-                &output_handle, 
-                input_len.clone(), 
-                SKIDColor::SKID_U8_ARRAY_RESOLUTION as u8
-            ),
-            
-        )
-    };
-
-    let data = client.read_one(output_handle.binding());
-    let data = data.chunks_exact(SKIDColor::SKID_U8_ARRAY_BYTE_SIZE_TOTAL)
-        .map(|chunk| 
-            SKIDColor::from_u8_array(chunk.try_into().unwrap())
-        )
-        .collect::<Vec<SKIDColor>>();
-    SKIDImage::from_1d_data(image_size.clone(), data)
-}
-

@@ -1328,6 +1328,7 @@ dependencies = [
 name = "skid_rust"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "cubecl",
 ]
 

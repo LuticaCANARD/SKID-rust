@@ -21,7 +21,7 @@ impl SKIDColor {
     pub fn to_f32_array(&self) -> [f32; 4] {
         [self.r, self.g, self.b, self.a]
     }
-    pub fn from_f32_array(arr: [f32; Self::SKID_U8_ARRAY_BYTE_SIZE_TOTAL]) -> Self {
+    pub fn from_f32_array(arr: [f32; Self::SKID_U8_ARRAY_BYTE_SIZE]) -> Self {
         SKIDColor {
             r: arr[0],
             g: arr[1],
