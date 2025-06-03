@@ -1,44 +1,85 @@
 use crate::model::skid_image::SKIDSizeVector2;
 use crate::model::{skid_color::SKIDColor, skid_image::SKIDImage};
+use cubecl::prelude::le;
 use image::{ImageFormat, Rgba};
 use std::fs::File;
 use std::io::BufWriter;
+use std::sync::{Arc, Mutex};
+use std::thread;
+// Define a static default color to avoid temporary borrow issues
+static DEFAULT_COLOR: SKIDColor = SKIDColor {
+    r: 0.0,
+    g: 0.0,
+    b: 0.0,
+    a: 0.0,
+};
 
 pub fn export_to_png(
     image: &SKIDImage,
     file_path: &str,
+    thread_count: Option<usize>,
 ) -> Result<(), String> {
-    // Create a file to write the PNG image
+   
     let file = File::create(file_path).map_err(|e| e.to_string())?;
     let ref mut writer = BufWriter::new(file);
-
-    let img_data = image.get_data();
     let size = image.get_size();
+    let width = size.width;
+    let height = size.height;
+    let num_threads = if let Some(count) = thread_count {count} 
+    else {4};// 기본값으로 4개의 스레드를 사용
+    let rows_per_thread = (height + num_threads - 1) / num_threads;
+    let default_row = Arc::new(vec![DEFAULT_COLOR; size.width]);
+    // 미리 2차원 벡터를 준비
+    let rows = Arc::new(Mutex::new(vec![vec![[0u16; 4]; width]; height]));
+    let mut handles = Vec::new();
+    let origin_image = Arc::new(image.get_data().clone());
+    for thread_idx in 0..num_threads {
+        let rows = Arc::clone(&rows); // 각 스레드에 Arc clone 전달
+        let start_row = thread_idx * rows_per_thread;
+        let end_row = ((thread_idx + 1) * rows_per_thread).min(height);
+        let origin_image = Arc::clone(&origin_image); // 각 스레드에 Arc clone 전달
+        let default_row = Arc::clone(&default_row);
+        let handle = thread::spawn(move || {
+            for y in start_row..end_row {
+            let value = origin_image.get(y);
+            let now_row = value.unwrap_or(&default_row);
+                for x in 0..width {
+                    let color = now_row.get(x).unwrap_or(&DEFAULT_COLOR);
+                    let generated_r = (color.r * 65535.0) as u16;
+                    let generated_g = (color.g * 65535.0) as u16;
+                    let generated_b = (color.b * 65535.0) as u16;
+                    let generated_a = (color.a * 65535.0) as u16;
+                    // 각 스레드에서 lock을 얻어야 함
+                    let mut rows_guard = rows.lock().unwrap();
+                    rows_guard[y][x] = [generated_r, generated_g, generated_b, generated_a];
+                }
+            }
+        });
+        handles.push(handle);
+}
+    for handle in handles {
+        handle.join().unwrap();
+    }
 
-    // Create an image buffer with the correct dimensions
-    let mut img: image::ImageBuffer<Rgba<u16>, _> = image::ImageBuffer::new(size.width as u32, size.height as u32);
-    img.enumerate_pixels_mut().for_each(|(x, y, pixel)| {
-        let color = image.get_pixel(x, y);
+    // 1차원 u16 벡터로 변환
+    let rows = Arc::try_unwrap(rows)
+        .map_err(|_| "Arc unwrap failed: 다른 스레드에서 rows를 아직 참조 중입니다.".to_string())?
+        .into_inner()
+        .map_err(|_| "Mutex 해제 실패".to_string())?;
 
-        if color.is_none() {
-            // If the pixel is out of bounds, set it to transparent black
-            *pixel = Rgba([0,0,0,0]);
-            return;
-        }
-        let color = color.unwrap();
-        let generated_r = (color.r * 65535.0) as u16; // Scale to u16 range
-        let generated_g = (color.g * 65535.0) as u16; // Scale to u16 range
-        let generated_b = (color.b * 65535.0) as u16; // Scale to u16 range
-        let generated_a = (color.a * 65535.0) as u16; // Scale to u16 range
+    let flat: Vec<u16> = rows.into_iter()
+        .flat_map(|row| row.into_iter().flat_map(|px| px))
+        .collect();
 
-        *pixel = Rgba([generated_r , generated_g, generated_b,generated_a]);
-    });
+    let img: image::ImageBuffer<Rgba<u16>, _> =
+        image::ImageBuffer::from_raw(width as u32, height as u32, flat)
+            .ok_or("Failed to create image buffer")?;
 
-    // Write the image as PNG
     img.write_to(writer, ImageFormat::Png)
         .map_err(|e| e.to_string())?;
 
     Ok(())
+
 }
 
 

@@ -26,7 +26,7 @@ pub fn test_file_write() {
     let file_path = TEST_OUTPUT;
 
     // Export the image to PNG
-    let result = export_to_png(&new_image, file_path);
+    let result = export_to_png(&new_image, file_path,Some(8));
     assert!(result.is_ok(), "Failed to export image: {:?}", result);
 }
 
