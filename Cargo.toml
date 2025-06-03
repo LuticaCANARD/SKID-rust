@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+
+[lib]
+name = "skid_rust_backend" # 라이브러리 파일 이름에 영향을 줍니다.
+crate-type = ["cdylib"]

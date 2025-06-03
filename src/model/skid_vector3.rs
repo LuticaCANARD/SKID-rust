@@ -1,3 +1,4 @@
+#[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SKIDVector3 {
     pub x: f32,
@@ -83,4 +84,48 @@ impl std::ops::Neg for SKIDVector3 {
             z: -self.z,
         }
     }
+}
+
+
+#[unsafe(no_mangle)]
+pub extern "C" fn skid_vector3_new(x: f32, y: f32, z: f32) -> SKIDVector3 {
+    SKIDVector3::new(x, y, z)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn skid_vector3_dot(v1: SKIDVector3, v2: SKIDVector3) -> f32 {
+    v1.dot(&v2)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn skid_vector3_cross(v1: SKIDVector3, v2: SKIDVector3) -> SKIDVector3 {
+    v1.cross(&v2)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn skid_vector3_add(v1: SKIDVector3, v2: SKIDVector3) -> SKIDVector3 {
+    v1 + v2 // Rust 내부의 Add 트레잇 사용
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn skid_vector3_sub(v1: SKIDVector3, v2: SKIDVector3) -> SKIDVector3 {
+    v1 - v2 // Rust 내부의 Sub 트레잇 사용
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn skid_vector3_mul_f32(v: SKIDVector3, scalar: f32) -> SKIDVector3 {
+    v * scalar // Rust 내부의 Mul<f32> 트레잇 사용
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn skid_vector3_div_f32(v: SKIDVector3, scalar: f32) -> SKIDVector3 {
+    if scalar == 0.0 {
+        return SKIDVector3::new(0.0, 0.0, 0.0);
+    }
+    v / scalar // Rust 내부의 Div<f32> 트레잇 사용
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn skid_vector3_neg(v: SKIDVector3) -> SKIDVector3 {
+    -v // Rust 내부의 Neg 트레잇 사용
 }
