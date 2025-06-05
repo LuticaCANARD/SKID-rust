@@ -1,11 +1,11 @@
 use crate::model::skid_image::SKIDSizeVector2;
 use crate::model::{skid_color::SKIDColor, skid_image::SKIDImage};
-use cubecl::prelude::le;
 use image::{ImageFormat, Rgba};
 use std::fs::File;
-use std::io::BufWriter;
+use std::io::{BufWriter,BufReader};
 use std::sync::{Arc, Mutex};
 use std::thread;
+
 // Define a static default color to avoid temporary borrow issues
 static DEFAULT_COLOR: SKIDColor = SKIDColor {
     r: 0.0,
@@ -19,7 +19,7 @@ pub fn export_to_png(
     file_path: &str,
     thread_count: Option<usize>,
 ) -> Result<(), String> {
-   
+    
     let file = File::create(file_path).map_err(|e| e.to_string())?;
     let ref mut writer = BufWriter::new(file);
     let size = image.get_size();
@@ -83,11 +83,8 @@ pub fn export_to_png(
 }
 
 
-pub fn import_from_png(file_path: &str) -> Result<SKIDImage, String> {
-    use image::{ImageBuffer, Rgba};
-    use std::fs::File;
-    use std::io::BufReader;
-
+pub fn import_from_png(file_path: &str,thread_count:Option<usize>) -> Result<SKIDImage, String> {
+    let thread_count = thread_count.unwrap_or(4); // 기본값으로 4개의 스레드를 사용
     // Open the file
     let file = File::open(file_path).map_err(|e| e.to_string())?;
     let reader = BufReader::new(file);
@@ -100,23 +97,51 @@ pub fn import_from_png(file_path: &str) -> Result<SKIDImage, String> {
     // Get the dimensions
     let (width, height) = img.dimensions();
 
-    let mut pixel_data:Vec<Vec<SKIDColor>> = vec![
-        vec![SKIDColor::new( 0.0, 0.0, 0.0, 0.0); width as usize]; 
+    let pixel_data =  Arc::new(Mutex::new(vec![
+        vec![SKIDColor::new( 0.0, 0.0, 0.0, 0.0 ); width as usize]; 
         height as usize
-    ];
-    // Fill the SKIDImage with pixel data
-    for (x, y, pixel) in img.enumerate_pixels() {
-        let Rgba([r, g, b, a]) = *pixel;
-        let color = SKIDColor::new(
-            r as f32 / 65535.0,
-            g as f32 / 65535.0,
-            b as f32 / 65535.0,
-            a as f32 / 65535.0,
-        );
+    ]));
 
-        // Set the pixel in the SKIDImage
-        pixel_data[y as usize][x as usize] = color;
+    let row_per_thread = ((height + thread_count as u32 - 1) / thread_count as u32) as usize;
+    let img = Arc::new(img);
+
+    // Fill the SKIDImage with pixel data
+
+
+    let mut handles = Vec::new();
+    for thread_idx in 0..thread_count {
+        let pixel_data = Arc::clone(&pixel_data);
+        let img = Arc::clone(&img);
+        let start_row = thread_idx * row_per_thread ;
+        let end_row = ((thread_idx + 1) * row_per_thread).min(height as usize);
+
+        let handle = thread::spawn(move || {
+            for y in start_row..end_row {
+                for x in 0..width {
+                    let pixel = img.get_pixel(x as u32, y as u32);
+                    let Rgba([r, g, b, a]) = *pixel;
+                    let color = SKIDColor::new(
+                        r as f32 / 65535.0,
+                        g as f32 / 65535.0,
+                        b as f32 / 65535.0,
+                        a as f32 / 65535.0,
+                    );
+                    let mut data = pixel_data.lock().unwrap();
+                    data[y][x as usize] = color;
+                }
+            }
+        });
+        handles.push(handle);
     }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+    let pixel_data = Arc::try_unwrap(pixel_data)
+        .map_err(|_| "Arc unwrap failed".to_string())?
+        .into_inner()
+        .map_err(|_| "Mutex unlock failed".to_string())?;
+
 
     let skid_image = SKIDImage::from_data_size(
         SKIDSizeVector2 { 

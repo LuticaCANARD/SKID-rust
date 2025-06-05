@@ -4,7 +4,7 @@ use crate::utils::file_io::export_to_png;
 use crate::utils::{self, gpu_opt};
 use std::fs;
 
-const TEST_OUTPUT: &str = "output/test_output2.png";
+const TEST_OUTPUT: &str = "output/test_output.png";
 
 #[test]
 pub fn test_file_write() {
@@ -41,7 +41,7 @@ pub fn test_file_read() {
     assert!(exists, "File does not exist: {}", file_path);
 
     // Load the image from the file
-    let loaded_image = utils::file_io::import_from_png(file_path);
+    let loaded_image = utils::file_io::import_from_png(file_path,None);
 
     assert!(loaded_image.is_ok(), "Failed to load image from file: {:?}", loaded_image.err());
     let image = loaded_image.unwrap();
