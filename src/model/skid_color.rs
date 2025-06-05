@@ -25,10 +25,10 @@ impl SKIDColor {
     }
     pub fn from_f32_array(arr: [f32; Self::SKID_U8_ARRAY_BYTE_SIZE]) -> Self {
         SKIDColor {
-            r: arr[0],
-            g: arr[1],
-            b: arr[2],
-            a: arr[3],
+            r: arr[0].clamp(0.0, 1.0),
+            g: arr[1].clamp(0.0, 1.0),
+            b: arr[2].clamp(0.0, 1.0),
+            a: arr[3].clamp(0.0, 1.0),
         }
     }
 

@@ -18,14 +18,53 @@ fn kernel_make_normal_map<F: Float>(
             let py = ABSOLUTE_POS_Y + y;
             let idx = py * width + px;
 
+            let up_y = if py > 0 { py - 1 } else { height - 1 };
+            let up_r = input[up_y* width + px][0]; // R
+            let up_g = input[up_y* width + px][1]; // G
+            let up_b = input[up_y* width + px][2]; // B
+            let d_up = compute_grayscale::<F>(up_r, up_g, up_b);
 
-            let n_r = input[idx][0]; // R
-            let n_g = input[idx][1]; // G
-            let n_b = input[idx][2]; // B
+            let down_y = if py < height - 1 { py + 1 } else { 0u32.into() };
+            let down_r = input[down_y * width + px][0]; // R
+            let down_g = input[down_y * width + px][1]; // G
+            let down_b = input[down_y * width + px][2]; // B
+            let d_down = compute_grayscale::<F>(down_r, down_g, down_b);
+
+            let left_x = if px > 0 { px - 1 } else { width - 1 };
+            let left_r = input[py * width + left_x][0]; // R
+            let left_g = input[py * width + left_x][1]; // G
+            let left_b = input[py * width + left_x][2]; // B
+            let d_left = compute_grayscale::<F>(left_r, left_g, left_b);
+
+            let right_x = if px < width - 1 { px + 1 } else { 0u32.into() };
+            let right_r = input[py * width + right_x][0]; // R
+            let right_g = input[py * width + right_x][1]; // G
+            let right_b = input[py * width + right_x][2]; // B
+            let d_right = compute_grayscale::<F>(right_r, right_g, right_b);
+
+            let d_x = (d_right - d_left) * x_factor;
+            let d_y = (d_down - d_up) * y_factor;
+            let d_z = F::new(1.0); // Assuming a constant depth value of 1.0
+
+            let normal_x = d_x;
+            let normal_y = d_y;
+            let normal_z = d_z;
+
+            let normal_length = F::sqrt(normal_x * normal_x + normal_y * normal_y + normal_z * normal_z);
+            if normal_length == F::new(0.0) {
+                terminate!(F::new(0.0)); // Avoid division by zero
+            }
+            let normalized_x = normal_x / normal_length;
+            let normalized_y = normal_y / normal_length;
+            let normalized_z = normal_z / normal_length;
+
+            let n_r = normal_vector_size::<F>(normalized_x , F::new(-0.), F::new(1.0));
+            let n_g = normal_vector_size::<F>(normalized_y , F::new(-0.), F::new(1.0));
+            let n_b = normal_vector_size::<F>(normalized_z , F::new(-0.), F::new(1.0));
             output[idx*4+0] = n_r; // R
             output[idx*4+1] = n_g; // G
             output[idx*4+2] = n_b; // B
-            output[idx*4+3] = input[idx][3]; // A
+            output[idx*4+3] = F::new(1.0); // A
         }
     }
 }
@@ -33,10 +72,14 @@ fn kernel_make_normal_map<F: Float>(
 pub fn make_normal_map_base<R:Runtime>(
     runtime: R::Device,
     original_image: &SKIDImage,
+    x_factor: Option<f32>,
+    y_factor: Option<f32>,
 ) -> SKIDImage {
     launch::<R>(
         &runtime,
-        original_image
+        original_image,
+        x_factor,
+        y_factor,
     )
 }
 
@@ -44,9 +87,14 @@ pub fn make_normal_map_base<R:Runtime>(
 fn launch<T: Runtime>(
     run_device: &T::Device,
     original_image: &SKIDImage,
+    x_factor: Option<f32>,
+    y_factor: Option<f32>,
 ) -> SKIDImage {
     let client = T::client(run_device);
 
+
+    let x_factor = x_factor.unwrap_or(0.5);
+    let y_factor = y_factor.unwrap_or(0.5);
     let w_size = original_image.get_size().width;
     let h_size = original_image.get_size().height;
     let w_u32 = w_size as u32;
@@ -72,8 +120,8 @@ fn launch<T: Runtime>(
             ArrayArg::from_raw_parts::<f32>(&input_handle, pixel_count, 4),
             ScalarArg::from(cubecl::frontend::ScalarArg { elem: w_u32 }),
             ScalarArg::from(cubecl::frontend::ScalarArg { elem: h_u32 }),
-            ScalarArg::from(cubecl::frontend::ScalarArg { elem:0.5 }),
-            ScalarArg::from(cubecl::frontend::ScalarArg { elem:0.5 }),
+            ScalarArg::from(cubecl::frontend::ScalarArg { elem:x_factor }),
+            ScalarArg::from(cubecl::frontend::ScalarArg { elem:y_factor }),
             ArrayArg::from_raw_parts::<f32>(&output_handle, pixel_count, 1),
         )
     };

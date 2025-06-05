@@ -26,6 +26,8 @@ fn gpu_normap_tests() {
     let _result_image = make_normal_map::make_normal_map_base::<cubecl::cuda::CudaRuntime>(
         Default::default(),
         &example_image,
+        Some(1.),
+        Some(1.),
     );
 
     file_io::export_to_png(
