@@ -1,5 +1,7 @@
+use cubecl::CubeType;
+
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, CubeType)]
 pub struct SKIDColor {
     pub r: f32,
     pub g: f32,
