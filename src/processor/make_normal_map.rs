@@ -1,15 +1,15 @@
 use std::sync::{Arc, Mutex};
 
 use cubecl::{cube, frontend::CompilationArg, prelude::{Array, ArrayArg, Float, FloatExpand, ScalarArg, UNIT_POS_X, UNIT_POS_Y}, CubeCount, CubeDim, CubeElement, Runtime};
-use crate::model::{skid_color::SKIDColor, skid_image::SKIDImage};
-
-
+use crate::{model::{skid_color::SKIDColor, skid_image::SKIDImage}, utils::graphic_fn::{compute_grayscale, normal_vector_size}};
 
 #[cube(launch_unchecked)]
 fn kernel_make_normal_map<F: Float>(
     input: &Array<F>,
     width: u32,
     height: u32,
+    x_factor: F,
+    y_factor: F,
     output: &mut Array<F>,
 ) {
     let position_x = UNIT_POS_X;
@@ -23,30 +23,47 @@ fn kernel_make_normal_map<F: Float>(
     let left_r = input[x_left][position_y][0];
     let left_g = input[x_left][position_y][1];
     let left_b = input[x_left][position_y][2];
-    let left_a = input[x_left][position_y][3];
+    let left_delta = compute_grayscale::<F>(left_r, left_g, left_b);
 
     let right_r = input[x_right][position_y][0];
     let right_g = input[x_right][position_y][1];
     let right_b = input[x_right][position_y][2];
-    let right_a = input[x_right][position_y][3];
+    let right_delta = compute_grayscale::<F>(right_r, right_g, right_b);
 
     let top_r = input[position_x][y_top][0];
     let top_g = input[position_x][y_top][1];
     let top_b = input[position_x][y_top][2];
-    let top_a = input[position_x][y_top][3];
+    let top_delta = compute_grayscale::<F>(top_r, top_g, top_b);
 
     let bottom_r = input[position_x][y_bottom][0];
     let bottom_g = input[position_x][y_bottom][1];
     let bottom_b = input[position_x][y_bottom][2];
-    let bottom_a = input[position_x][y_bottom][3];
+    let bottom_delta = compute_grayscale::<F>(bottom_r, bottom_g, bottom_b);
 
+    let dx = (right_delta - left_delta) * x_factor;
+    let dy = (bottom_delta - top_delta) * y_factor;
+
+    let normal_x = dx / F::sqrt(dx * dx + dy * dy);
+    let normal_y = dy / F::sqrt(dx * dx + dy * dy);
+    let normal_z = 1.0;
+    let min_scale = F::new(0.);
+    let max_scale = F::new(1.);
+
+    let n_r = normal_vector_size::<F>(normal_x, min_scale, max_scale);
+    let n_g = normal_vector_size::<F>(normal_y, min_scale, max_scale);
+    let n_b = normal_vector_size::<F>(F::new(normal_z), min_scale, max_scale);
     
-    
+    let n_a = F::new(1.0);
+    let idx = (position_y * width + position_x);
+    output[idx * 4 + 0] = n_r;
+    output[idx * 4 + 1] = n_g;
+    output[idx * 4 + 2] = n_b;
+    output[idx * 4 + 3] = n_a;
 }
 
 pub fn make_normal_map_base<R:Runtime>(
-    original_image: &SKIDImage,
     runtime: R::Device,
+    original_image: &SKIDImage,
 ) -> SKIDImage {
     launch::<R>(
         &runtime,
@@ -86,6 +103,8 @@ fn launch<T: Runtime>(
             ArrayArg::from_raw_parts::<f32>(&input_handle, pixel_count, 1),
             ScalarArg::from(cubecl::frontend::ScalarArg { elem: w_u32 }),
             ScalarArg::from(cubecl::frontend::ScalarArg { elem: h_u32 }),
+            ScalarArg::from(cubecl::frontend::ScalarArg { elem:0.5 }),
+            ScalarArg::from(cubecl::frontend::ScalarArg { elem:0.5 }),
             ArrayArg::from_raw_parts::<f32>(&output_handle, pixel_count, 1),
         )
     };
