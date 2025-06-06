@@ -1,7 +1,7 @@
 [package]
 name = "skid_rust"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 cubecl = { version = "0.5.0", features = ["default"] } # Cubecl 라이브러리 의존성
@@ -17,3 +17,5 @@ default = ["use_cuda", "use_image"] # 기본 기능은 CUDA와 이미지 기능�
 use_cuda = ["cubecl/cuda"]
 use_image = ["image"] # 이미지 기능을 사용하려면 이 기능을 활성화해야 합니다.
 
+[build-dependencies]
+csbindgen = "1.8.0"

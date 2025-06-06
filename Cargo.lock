@@ -342,6 +342,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43da5946c66ffcc7745f48db692ffbb10a83bfe0afd96235c5c2a4fb23994929"
 
 [[package]]
+name = "csbindgen"
+version = "1.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c26b9831049b947d154bba920e4124053def72447be6fb106a96f483874b482a"
+dependencies = [
+ "regex",
+ "syn",
+]
+
+[[package]]
 name = "cubecl"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1882,6 +1892,7 @@ name = "skid_rust"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "csbindgen",
  "cubecl",
  "image",
 ]
