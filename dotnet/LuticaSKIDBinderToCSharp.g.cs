@@ -73,6 +73,9 @@ namespace LuticaSKIDBinder
         [DllImport(__DllName, EntryPoint = "skid_vector3_neg", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern SKIDVector3 skid_vector3_neg(SKIDVector3 v);
 
+        [DllImport(__DllName, EntryPoint = "skid_generate_normal_map", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern SKIDImage skid_generate_normal_map(SKIDImage input_image, NormalMapOptions options);
+
 
     }
 
@@ -109,6 +112,22 @@ namespace LuticaSKIDBinder
     internal unsafe partial struct SKIDImageHandle
     {
         public SKIDImage* ptr;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal unsafe partial struct CalcDevice
+    {
+        public uint device_id;
+        public str* device_name;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal unsafe partial struct NormalMapOptions
+    {
+        public float x_factor;
+        public float y_factor;
+        [MarshalAs(UnmanagedType.U1)] public bool make_by_gpu;
+        public CalcDevice gpu_option;
     }
 
 

@@ -1,5 +1,45 @@
-use crate::model::{skid_color::SKIDColor, skid_vector3::SKIDVector3};
+use crate::model::{skid_image::SKIDImage,skid_color::SKIDColor, skid_vector3::SKIDVector3};
+pub mod skid_image_ffi;
 
+#[repr(C)]
+pub enum ImageOptsTag {
+    MakeNormalMap,
+    MakeHeightMap,
+    MakeNormalMapFromHeightMap,
+    MakeHeightMapFromNormalMap,
+    MakeNormalMapFromHeightMapWithScale,
+    Blend,
+    BlendAdd,
+    BlendSubtract,
+    BlendMultiply,
+    BlendDivide,
+}
+
+#[repr(C)]
+pub struct BlendArgs {
+    pub img1: *mut SKIDImage,
+    pub img2: *mut SKIDImage,
+    pub value: f32,
+}
+
+#[repr(C)]
+pub struct ImageOptArgs {
+    pub img: *mut SKIDImage,
+    pub value: f32,
+}
+
+#[repr(C)]
+pub union ImageOptsData {
+    pub img: *mut SKIDImage,
+    pub blend: std::mem::ManuallyDrop<BlendArgs>,
+    pub img_with_value: std::mem::ManuallyDrop<ImageOptArgs>,
+}
+
+#[repr(C)]
+pub struct ImageOptsFFI {
+    pub tag: ImageOptsTag,
+    pub data: ImageOptsData,
+}
 
 #[no_mangle]
 pub extern "C" fn skid_color_new(r: f32, g: f32, b: f32, a: f32) -> SKIDColor {
@@ -91,4 +131,3 @@ pub extern "C" fn skid_vector3_neg(v: SKIDVector3) -> SKIDVector3 {
     -v // Rust 내부의 Neg 트레잇 사용
 }
 
-pub mod skid_image_ffi;
