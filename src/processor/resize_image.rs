@@ -1,6 +1,4 @@
-use cubecl::Runtime;
-use cubecl::prelude::{Array, ArrayArg, Float, FloatExpand, ScalarArg};
-use cubecl::{cube, CubeCount, CubeDim, CubeElement};
+use cubecl::{cube, frontend::CompilationArg, terminate, CubeCount, CubeDim, CubeElement, Runtime, prelude::*};
 
 use crate::model::{skid_color::SKIDColor, skid_image::{SKIDImage, SKIDSizeVector2}};
 
@@ -16,6 +14,32 @@ pub fn resize_image<R:Runtime>(
         new_size,
         thread_count
     )
+}
+
+#[cube(launch_unchecked)]
+fn resize_kernel<F: Float>(
+    input: &Array<F>,
+    width: u32,
+    height: u32,
+    new_width: u32,
+    new_height: u32,
+    output: &mut Array<F>,
+) {
+    for x in 0..CUBE_CLUSTER_DIM_X {
+        let px = ABSOLUTE_POS_X + x;
+        for y in 0..CUBE_CLUSTER_DIM_Y {
+            let py = ABSOLUTE_POS_Y + y;
+            let idx = py * width + px;
+
+            // Calculate the corresponding pixel in the new image
+            let new_x = (px * new_width) / width;
+            let new_y = (py * new_height) / height;
+            let new_idx = new_y * new_width + new_x;
+
+            // Copy the pixel value from input to output
+            output[new_idx] = input[idx];
+        }
+    }
 }
 
 
@@ -42,8 +66,28 @@ fn launch<T: Runtime>(
 
 
     println!("Launching resize with runtime: {}x{}", new_width, new_height);
-    unsafe {
 
+
+    unsafe {
+        resize_kernel::launch_unchecked::<f32, T>(
+            &client,
+            CubeCount::Static(threads_x as u32, threads_y as u32, 1),
+            CubeDim::new(block_x as u32, block_y as u32, 1),
+            ArrayArg::from_raw_parts::<f32>(
+                &input_handle,
+                pixel_count, 
+                4
+            ),
+            ScalarArg::from(cubecl::frontend::ScalarArg { elem: original_image.get_size().width as u32}),
+            ScalarArg::from(cubecl::frontend::ScalarArg { elem: original_image.get_size().height as u32}),
+            ScalarArg::from(cubecl::frontend::ScalarArg { elem: new_width}),
+            ScalarArg::from(cubecl::frontend::ScalarArg { elem: new_height}),
+            ArrayArg::from_raw_parts::<f32>(
+                &output_handle, 
+                new_size.width * new_size.height, 
+                1
+            )
+        );
     }
 
     
