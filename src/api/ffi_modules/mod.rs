@@ -16,8 +16,6 @@ struct CalcDevice {
     
 // }
 
-
-
 #[repr(C)]
 struct NormalMapOptions {
     pub(crate) x_factor: Option<f32>,
@@ -30,12 +28,23 @@ extern "C" fn skid_generate_normal_map(
     input_image: SKIDImage,
     options: NormalMapOptions,
 ) -> SKIDImage {
-
     let x_factor = options.x_factor;
     let y_factor: Option<f32> = options.y_factor;
     let make_by_gpu = options.make_by_gpu;
+
     if let Some(gpu) = options.gpu_option {
         // Use GPU processing if available and requested
+        #[cfg(feature = "use_wgpu")]
+        {
+            use cubecl::wgpu::{WgpuDevice, WgpuRuntime};
+            let gpu_device = WgpuDevice::IntegratedGpu(gpu.device_id as usize); // Assuming the device_id corresponds to an integrated GPU
+            return crate::processor::make_normal_map::make_normal_map_base::<WgpuRuntime>(
+                gpu_device,
+                &input_image,
+                x_factor,
+                y_factor,
+            )
+        }
         #[cfg(feature = "use_cuda")]
         {
             use cubecl::cuda::{CudaDevice, CudaRuntime};
@@ -58,17 +67,7 @@ extern "C" fn skid_generate_normal_map(
                 y_factor,
             )
         }
-        #[cfg(feature = "use_wgpu")]
-        {
-            use cubecl::wgpu::{WgpuDevice, WgpuRuntime};
-            let gpu_device = WgpuDevice::IntegratedGpu(gpu.device_id as usize); // Assuming the device_id corresponds to an integrated GPU
-            return crate::processor::make_normal_map::make_normal_map_base::<WgpuRuntime>(
-                gpu_device,
-                &input_image,
-                x_factor,
-                y_factor,
-            )
-        }
+        
     } else {
         use cubecl::wgpu::{WgpuDevice, WgpuRuntime};
 
