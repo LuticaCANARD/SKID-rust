@@ -18,13 +18,10 @@ namespace LuticaSKIDBinder
 
 
         [DllImport(__DllName, EntryPoint = "skid_image_new", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        internal static extern SKIDImageHandle skid_image_new(nuint width, nuint height);
-
-        [DllImport(__DllName, EntryPoint = "skid_image_free", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        internal static extern void skid_image_free(SKIDImageHandle handle);
+        internal static extern SKIDImage* skid_image_new(nuint width, nuint height);
 
         [DllImport(__DllName, EntryPoint = "skid_image_get_size", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        internal static extern SKIDSizeVector2 skid_image_get_size(SKIDImageHandle handle);
+        internal static extern SKIDSizeVector2 skid_image_get_size(SKIDImage* handle);
 
         [DllImport(__DllName, EntryPoint = "skid_color_new", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern SKIDColor skid_color_new(float r, float g, float b, float a);
@@ -107,12 +104,6 @@ namespace LuticaSKIDBinder
         public float x;
         public float y;
         public float z;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    internal unsafe partial struct SKIDImageHandle
-    {
-        public SKIDImage* ptr;
     }
 
     [StructLayout(LayoutKind.Sequential)]

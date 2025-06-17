@@ -1,7 +1,7 @@
 use cubecl::{cube, prelude::Float, terminate};
 #[cube]
 pub fn compute_grayscale<F:Float>(r: F, g: F, b: F) -> F {
-    F::new(0.299) * r + F::new(0.587) * g + F::new(0.587) * g + F::new(0.114) * b
+    F::new(0.299) * r + F::new(0.587) * g + F::new(0.114) * b
 }
 #[cube]
 pub fn compute_luminance<F:Float>(r: F, g: F, b: F) -> F {
