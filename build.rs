@@ -11,6 +11,8 @@ fn main() {
         .csharp_dll_name("skid_rust_backend")
         .csharp_namespace("LuticaSKIDBinder")
         .csharp_class_name("LuticaSKIDBinderToCSharp")
+        .csharp_file_header("#if false")
+        .csharp_file_footer("#endif") // This is a dummy header/footer to avoid compilation issues in C#.
         .generate_csharp_file("dotnet/LuticaSKIDBinderToCSharp.g.cs")
         .unwrap();
 }
