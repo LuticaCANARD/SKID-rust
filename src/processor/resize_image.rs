@@ -1,6 +1,8 @@
-use cubecl::{cube, frontend::CompilationArg, terminate, CubeCount, CubeDim, CubeElement, Runtime, prelude::*};
+use cubecl::{cube, frontend::*, terminate, CubeCount, CubeDim, CubeElement, Runtime, prelude::*,Kernel};
 
 use crate::model::{skid_color::SKIDColor, skid_image::{SKIDImage, SKIDSizeVector2}};
+
+
 
 pub fn resize_image<R:Runtime>(
     runtime: &R::Device,
@@ -30,17 +32,48 @@ fn resize_scaleup_kernel<F: Float>(
         let px = ABSOLUTE_POS_X + x;
         for y in 0..CUBE_CLUSTER_DIM_Y {
             let py = ABSOLUTE_POS_Y + y;
-            let idx = py * width + px;
+            // Calculate the corresponding coordinates in the original image
+            let original_x = (px as f32 + 0.5) * (width as f32 / new_width as f32) - 0.5;
+            let original_y = (py as f32 + 0.5) * (height as f32 / new_height as f32) - 0.5;
 
-            // Calculate the corresponding pixel in the new image
-            let new_x = (px * new_width) / width;
-            let new_y = (py * new_height) / height;
-            let new_idx = new_y * new_width + new_x;
+            let x_floor = original_x as i32;
+            let y_floor = original_y as i32;
 
-            
-            // Copy the pixel value from input to output
-            output[new_idx] = input[idx];
+            let mut final_r = F::new(0.0);
+            let mut final_g = F::new(0.0);
+            let mut final_b = F::new(0.0);
+            let mut final_a = F::new(0.0);
 
+            // Iterate over the 4x4 neighborhood
+            for i in -1..=2 {
+                for j in -1..=2 {
+                    let sample_x = (x_floor + i) as u32;
+                    let sample_y = (y_floor + j) as u32;
+
+                    // Check if the sampled pixel is within the original image bounds
+                    if sample_x < width && sample_y < height {
+                        let idx = (sample_y * width + sample_x) * 4;
+                        let pixel_r = input[idx];
+                        let pixel_g = input[idx + 1];
+                        let pixel_b = input[idx + 2];
+                        let pixel_a = input[idx + 3];
+
+                        let weight_x = (original_x - (sample_x as f32)) * (original_x - (sample_x as f32));
+                        let weight_y = (original_y - (sample_y as f32)) * (original_y - (sample_y as f32));
+                        let weight= F::cast_from((1.0 - weight_x) * (1.0 - weight_y));
+                        final_r += pixel_r * weight;
+                        final_g += pixel_g * weight;
+                        final_b += pixel_b * weight;
+                        final_a += pixel_a * weight;
+                    }
+                }
+            }
+
+            let new_idx = (py * new_width + px) * 4;
+            output[new_idx] = final_r;
+            output[new_idx + 1] = final_g;
+            output[new_idx + 2] = final_b;
+            output[new_idx + 3] = final_a; // 보간된 알파 채널
         }
     }
 }
