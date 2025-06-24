@@ -83,10 +83,10 @@ pub fn resize_scaleup_kernel<F: Float>(
                     }
                 }
                 let new_idx = (py * new_width + px) * 4;
-                output[new_idx] = final_r;
-                output[new_idx + 1] = final_g;
-                output[new_idx + 2] = final_b;
-                output[new_idx + 3] = final_a; // 보간된 알파 채널
+                output[new_idx] = F::cast_from(px as f32 / new_width as f32);
+                output[new_idx + 1] = F::cast_from(py as f32 / new_height as f32);
+                output[new_idx + 2] = F::new(1.0 as f32);
+                output[new_idx + 3] = F::new(1.0 as f32); // 보간된 알파 채널
             }
         }
     }

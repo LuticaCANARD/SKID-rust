@@ -1,6 +1,8 @@
+use std::time::Instant;
+
 use cubecl::wgpu::{Dx12, Vulkan};
 
-use crate::{model::{skid_color::SKIDColor, skid_image::{SKIDImage, SKIDSizeVector2}}, processor::{make_normal_map, resize_image::{self, resize_image}}, utils::{file_io, gpu_opt}};
+use crate::{model::{skid_color::SKIDColor, skid_image::{SKIDImage, SKIDSizeVector2}}, processor::{example_generator, make_normal_map, resize_image::{self, resize_image}}, utils::{file_io, gpu_opt}};
 
 
 
@@ -77,4 +79,30 @@ fn gpu_upscale_tests() {
         Some(8),
     ).expect("Failed to export resized image");
     println!("Result image: {:?}", result_image.get_size());
+}
+
+#[test]
+fn gpu_example_generator_tests() {
+
+    let start = Instant::now();
+    let _result_image = example_generator::launch::<cubecl::wgpu::WgpuRuntime>(
+        &Default::default(),
+        SKIDSizeVector2 {
+            width: 5120,
+            height: 2880,
+
+        },
+        Some(2),
+    );
+    let duration = start.elapsed();
+    println!("Example generator took: {:?}", duration);
+    println!("Result image: {:?}", _result_image.get_size());
+    let start_file = Instant::now();
+    file_io::export_rgba_channels_to_png(
+        &_result_image,
+        "output/example_generator_output",
+        // Some(8),
+    ).expect("Failed to export example generator image");
+    let duration_file = start_file.elapsed();
+    println!("File export took: {:?}", duration_file);
 }
