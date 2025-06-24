@@ -5,6 +5,17 @@ pub struct SKIDSizeVector2 {
     pub width: usize,
     pub height: usize,
 }
+impl SKIDSizeVector2 {
+    pub fn new(width: usize, height: usize) -> Self {
+        SKIDSizeVector2 { width, height }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.width == 0 || self.height == 0
+    }
+    pub fn from_tuple(tuple: (usize, usize)) -> Self {
+        SKIDSizeVector2 { width: tuple.0, height: tuple.1 }
+    }
+}
 pub struct SKIDImage {
     width: usize,
     height: usize,

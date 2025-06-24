@@ -51,16 +51,16 @@ fn kernel_make_normal_map<F: Float>(
             let normal_z = d_z;
 
             let normal_length = F::sqrt(normal_x * normal_x + normal_y * normal_y + normal_z * normal_z);
-            if normal_length == F::new(0.0) {
-                terminate!(F::new(0.0)); // Avoid division by zero
+            if normal_length == F::new(0.) {
+                terminate!(F::new(0.)); // Avoid division by zero
             }
             let normalized_x = normal_x / normal_length;
             let normalized_y = normal_y / normal_length;
             let normalized_z = normal_z / normal_length;
 
-            let n_r = normal_vector_size::<F>(normalized_x , F::new(-0.), F::new(1.0));
-            let n_g = normal_vector_size::<F>(normalized_y , F::new(-0.), F::new(1.0));
-            let n_b = normal_vector_size::<F>(normalized_z , F::new(-0.), F::new(1.0));
+            let n_r = normal_vector_size::<F>(normalized_x , F::new(-0.), F::new(1.));
+            let n_g = normal_vector_size::<F>(normalized_y , F::new(-0.), F::new(1.));
+            let n_b = normal_vector_size::<F>(normalized_z , F::new(-0.), F::new(1.));
             output[idx*4+0] = n_r; // R
             output[idx*4+1] = n_g; // G
             output[idx*4+2] = n_b; // B

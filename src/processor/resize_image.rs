@@ -19,7 +19,7 @@ pub fn resize_image<R:Runtime>(
 }
 
 #[cube(launch_unchecked)]
-fn resize_scaleup_kernel<F: Float>(
+pub fn resize_scaleup_kernel<F: Float>(
     input: &Array<F>,
     width: u32,
     height: u32,
@@ -27,57 +27,73 @@ fn resize_scaleup_kernel<F: Float>(
     new_height: u32,
     output: &mut Array<F>,
 ) {
+    let i_width = width as i32;
+    let i_height = height as i32;
+
     // TODO : 스플라인 보간 구현
     for x in 0..CUBE_CLUSTER_DIM_X {
         let px = ABSOLUTE_POS_X + x;
         for y in 0..CUBE_CLUSTER_DIM_Y {
             let py = ABSOLUTE_POS_Y + y;
-            // Calculate the corresponding coordinates in the original image
-            let original_x = (px as f32 + 0.5) * (width as f32 / new_width as f32) - 0.5;
-            let original_y = (py as f32 + 0.5) * (height as f32 / new_height as f32) - 0.5;
+            if px < new_width && py < new_height {
+                // Calculate the corresponding coordinates in the original image using the generic float type F
+                let original_x = (F::cast_from(px) + F::new(0.5)) * (F::cast_from(width) / F::cast_from(new_width)) - F::new(0.5);
+                let original_y = (F::cast_from(py) + F::new(0.5)) * (F::cast_from(height) / F::cast_from(new_height)) - F::new(0.5);
 
-            let x_floor = original_x as i32;
-            let y_floor = original_y as i32;
+                // Use `cast_from` for direct, idiomatic type conversion within the kernel.
+                let x_floor = i32::cast_from(original_x);
+                let y_floor = i32::cast_from(original_y);
 
-            let mut final_r = F::new(0.0);
-            let mut final_g = F::new(0.0);
-            let mut final_b = F::new(0.0);
-            let mut final_a = F::new(0.0);
+                let mut final_r = F::new(0.0);
+                let mut final_g = F::new(0.0);
+                let mut final_b = F::new(0.0);
+                let mut final_a = F::new(0.0);
 
-            // Iterate over the 4x4 neighborhood
-            for i in -1..=2 {
-                for j in -1..=2 {
-                    let sample_x = (x_floor + i) as u32;
-                    let sample_y = (y_floor + j) as u32;
+                // Iterate over the 4x4 neighborhood
+                for i in -1..=2 {
+                    for j in -1..=2 {
+                        let sample_x = (x_floor + i) as i32;
+                        let sample_y = (y_floor + j) as i32;
 
-                    // Check if the sampled pixel is within the original image bounds
-                    if sample_x < width && sample_y < height {
-                        let idx = (sample_y * width + sample_x) * 4;
-                        let pixel_r = input[idx];
-                        let pixel_g = input[idx + 1];
-                        let pixel_b = input[idx + 2];
-                        let pixel_a = input[idx + 3];
+                        // Check if the sampled pixel is within the original image bounds (0 <= coord < size)
+                        if sample_x >= 0 && sample_x < i_width && sample_y >= 0 && sample_y < i_height {
+                            // Cast to u32 for array indexing to fix the compile error
+                            let u_sample_x = u32::cast_from(sample_x);
+                            let u_sample_y = u32::cast_from(sample_y);
+                            let idx = (u_sample_y * width + u_sample_x) * 4;
 
-                        let weight_x = (original_x - (sample_x as f32)) * (original_x - (sample_x as f32));
-                        let weight_y = (original_y - (sample_y as f32)) * (original_y - (sample_y as f32));
-                        let weight= F::cast_from((1.0 - weight_x) * (1.0 - weight_y));
-                        final_r += pixel_r * weight;
-                        final_g += pixel_g * weight;
-                        final_b += pixel_b * weight;
-                        final_a += pixel_a * weight;
+                            let pixel_r = input[idx];
+                            let pixel_g = input[idx + 1];
+                            let pixel_b = input[idx + 2];
+                            let pixel_a = input[idx + 3];
+
+                            let weight_x = (original_x - F::cast_from(sample_x)) * (original_x - F::cast_from(
+                                sample_x
+                            ));
+                            let weight_y = (original_y - F::cast_from(sample_y)) * (original_y - F::cast_from(
+                                sample_y
+                            ));
+                            let weight = (F::new(1.0) - weight_x) * (F::new(1.0) - weight_y);
+
+                            final_r = final_r + F::cast_from(pixel_r * weight);
+                            final_g = final_g + F::cast_from(pixel_g * weight);
+                            final_b = final_b + F::cast_from(pixel_b * weight);
+                            final_a = final_a + F::cast_from(pixel_a * weight);
+                        }
                     }
                 }
+                let new_idx = (py * new_width + px) * 4;
+                output[new_idx] = final_r;
+                output[new_idx + 1] = final_g;
+                output[new_idx + 2] = final_b;
+                output[new_idx + 3] = final_a; // 보간된 알파 채널
             }
-
-            let new_idx = (py * new_width + px) * 4;
-            output[new_idx] = final_r;
-            output[new_idx + 1] = final_g;
-            output[new_idx + 2] = final_b;
-            output[new_idx + 3] = final_a; // 보간된 알파 채널
         }
     }
 }
 
+// This kernel uses a "gather" approach, iterating over output pixels.
+// This avoids race conditions from multiple threads writing to the same location.
 #[cube(launch_unchecked)]
 fn resize_scaledown_kernel<F: Float>(
     input: &Array<F>,
@@ -91,15 +107,20 @@ fn resize_scaledown_kernel<F: Float>(
         let px = ABSOLUTE_POS_X + x;
         for y in 0..CUBE_CLUSTER_DIM_Y {
             let py = ABSOLUTE_POS_Y + y;
-            let idx = py * width + px;
+            if px < new_width && py < new_height {
+                // Calculate corresponding coordinates in the original (larger) image
+                // using nearest-neighbor.
+                let original_x = (px * width) / new_width;
+                let original_y = (py * height) / new_height;
 
-            // Calculate the corresponding pixel in the new image
-            let new_x = (px * new_width) / width;
-            let new_y = (py * new_height) / height;
-            let new_idx = new_y * new_width + new_x;
+                let original_idx = (original_y * width + original_x) * 4;
+                let new_idx = (py * new_width + px) * 4;
 
-            // Copy the pixel value from input to output
-            output[new_idx] = input[idx];
+                // Copy the pixel value (all 4 channels) from input to output
+                for i in 0..4 {
+                    output[new_idx + i] = input[original_idx + i];
+                }
+            }
         }
     }
 }

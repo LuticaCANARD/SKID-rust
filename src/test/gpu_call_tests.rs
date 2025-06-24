@@ -1,6 +1,6 @@
 use cubecl::wgpu::{Dx12, Vulkan};
 
-use crate::{model::{skid_color::SKIDColor, skid_image::SKIDImage}, processor::make_normal_map, utils::{file_io, gpu_opt}};
+use crate::{model::{skid_color::SKIDColor, skid_image::{SKIDImage, SKIDSizeVector2}}, processor::{make_normal_map, resize_image::{self, resize_image}}, utils::{file_io, gpu_opt}};
 
 
 
@@ -45,4 +45,36 @@ fn gpu_normap_tests() {
     println!("Result image: {:?}", result_image.get_size());
     println!("Normal map first pixel color: {:?}", result_image.get_pixel(0, 0));
 
+}
+
+#[test]
+fn gpu_upscale_tests() {
+    let example_image = file_io::import_from_png("output/test_input.png", Some(4))
+        .expect("Failed to load image from file");
+    println!("Loaded image: {:?}", example_image.get_size());
+    
+    let device = cubecl::wgpu::WgpuDevice::DiscreteGpu(0);
+    
+    cubecl::wgpu::init_setup::<Vulkan>(
+        &device, cubecl::wgpu::RuntimeOptions{
+            ..Default::default()
+        }
+    );
+
+    let result_image = resize_image::resize_image::<cubecl::wgpu::WgpuRuntime>(
+        &device,
+        &example_image,
+        SKIDSizeVector2 {
+            width: 5120,
+            height: 2880,
+        },
+        Some(4),
+    );
+
+    file_io::export_to_png(
+        &result_image,
+        "output/resize_output2.png",
+        Some(8),
+    ).expect("Failed to export resized image");
+    println!("Result image: {:?}", result_image.get_size());
 }
