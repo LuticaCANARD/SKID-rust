@@ -15,21 +15,13 @@ pub fn gpu_example_generator(
             let new_idx = (py * width + px) * 4;
             let border_zone = 1024; // 32 pixels border zone
             let is_border = py % border_zone == 0 || px % border_zone == 0;
-            let r_p = if x==0 {
-                0.0f32.into()
+            let r_p = px as f32 / f32::cast_from(width);
+            let g_p = py as f32 / f32::cast_from(height);
+            let b_p = if is_border {
+                1.0f32.into()
             } else {
-                px as f32 / f32::cast_from(width)
-            };
-            let g_p = if y==0 { 
-                0.0f32.into()
-            } else { 
-                py as f32 / f32::cast_from(height) 
-            };
-            let b_p = if is_border { 
-                1.0f32.into() 
-            } else { 
-                (px as f32 / f32::cast_from(width)) * 0.5f32 
-                + (py as f32 / f32::cast_from(height)) * 0.5f32 
+                (px as f32 / f32::cast_from(width)) * 0.5f32
+                + (py as f32 / f32::cast_from(height)) * 0.5f32
             };
             output[new_idx] = r_p;
             output[new_idx + 1] = g_p;

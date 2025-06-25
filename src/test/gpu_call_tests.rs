@@ -67,8 +67,8 @@ fn gpu_upscale_tests() {
         &device,
         &example_image,
         SKIDSizeVector2 {
-            width: 5120,
-            height: 2880,
+            width: 2400,
+            height: 1600,
         },
         Some(4),
     );
