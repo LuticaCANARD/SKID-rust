@@ -1,6 +1,6 @@
 use crate::model::skid_image::SKIDSizeVector2;
 use crate::model::{skid_color::SKIDColor, skid_image::SKIDImage};
-use image::{ImageFormat, Rgba};
+use image::{ColorType, ImageEncoder, ImageFormat, Rgba};
 use std::fs::File;
 use std::io::{BufWriter,BufReader};
 use std::sync::{Arc, Mutex};
@@ -55,7 +55,6 @@ fn get_u16_color_vectors(
         handles.push(handle);
     }
     println!("Thread spawn time: {:?}", start.elapsed());
-    let start = std::time::Instant::now();
     // 스레드 결과 합치기
     let mut rows: Vec<Vec<[u16; 4]>> = Vec::with_capacity(height);
     for handle in handles {
@@ -249,7 +248,8 @@ pub fn export_to_png_by_custom(
     image: &SKIDImage,
     file_path: &str,
     thread_count: Option<usize>,
-    profile: Option<CompressionType>,
+    compression_profile: Option<CompressionType>,
+    filter_profile: Option<FilterType>,
 ) -> Result<(), String> {
 
     let file = File::create(file_path).map_err(|e| e.to_string())?;
@@ -278,7 +278,10 @@ pub fn export_to_png_by_custom(
         }))
         .collect();
 
-    
-    Ok(())
+    let img_writer = PngEncoder::new_with_quality(&mut writer, compression_profile.unwrap_or(CompressionType::Default),filter_profile.unwrap_or(FilterType::NoFilter));
 
+    img_writer.write_image(&flat, width as u32, height as u32, ColorType::Rgba16.into())
+        .map_err(|e| e.to_string())?;
+    println!("Image exported to {} successfully.", file_path);
+    Ok(())
 }
