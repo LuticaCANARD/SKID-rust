@@ -74,6 +74,36 @@ namespace LuticaSKIDBinder
         [DllImport(__DllName, EntryPoint = "skid_generate_normal_map", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern SKIDImage skid_generate_normal_map(SKIDImage input_image, NormalMapOptions options);
 
+        /// <summary>
+        ///  C#에서 float[] 배열을 받아 SKIDImage를 생성하고 핸들을 반환합니다.
+        /// </summary>
+        [DllImport(__DllName, EntryPoint = "skid_image_create_from_f32_array", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern ulong skid_image_create_from_f32_array(float* bytes, nuint width, nuint height);
+
+        /// <summary>
+        ///  핸들을 사용하여 이미지의 메모리를 해제합니다. (매우 중요!)
+        /// </summary>
+        [DllImport(__DllName, EntryPoint = "skid_image_free", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern void skid_image_free(ulong handle);
+
+        /// <summary>
+        ///  핸들을 사용하여 이미지 크기를 가져옵니다.
+        /// </summary>
+        [DllImport(__DllName, EntryPoint = "skid_image_get_size", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern int skid_image_get_size(ulong handle, SKIDSizeVector2* out_size);
+
+        /// <summary>
+        ///  핸들을 사용하여 이미지 데이터를 C#의 float[] 배열로 복사합니다.
+        /// </summary>
+        [DllImport(__DllName, EntryPoint = "skid_image_get_data_as_f32_array", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern int skid_image_get_data_as_f32_array(ulong handle, float* out_bytes, nuint buffer_len);
+
+        /// <summary>
+        ///  이미지 리사이즈 함수 (핸들 기반)
+        /// </summary>
+        [DllImport(__DllName, EntryPoint = "skid_image_resize", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        internal static extern ulong skid_image_resize(ulong handle, nuint new_width, nuint new_height);
+
 
     }
 

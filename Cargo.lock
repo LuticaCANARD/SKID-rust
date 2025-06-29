@@ -2003,6 +2003,7 @@ dependencies = [
  "csbindgen",
  "cubecl",
  "image",
+ "once_cell",
  "windows 0.48.0",
 ]
 
