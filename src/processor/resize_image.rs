@@ -17,64 +17,6 @@ pub fn resize_image<R:Runtime>(
         thread_count
     )
 }
-#[cube(launch_unchecked)]
-fn bilinear_interpolate<F: Float>(
-    input: &Array<F>,
-    x: u32,
-    y: u32,
-    x_lerp: u32,
-    y_lerp: u32,
-    output: &mut Array<F>,
-) {
-    let width = input.len() as u32 / 4; // Assuming input is a
-    let height = input.len() as u32 / (width * 4);
-    let x0 = x;
-    let y0 = y;
-    let x1 = if x + 1 < width { x + 1 } else { x };
-    let y1 = if y + 1 < height { y + 1 } else { y };
-    let x0_idx = (y0 * width + x0);
-    let x1_idx = (y0 * width + x1);
-    let y0_idx = (y1 * width + x0);
-    let y1_idx = (y1 * width + x1);
-    let x0_r = input[x0_idx][0];
-    let x0_g = input[x0_idx][1];
-    let x0_b = input[x0_idx][2];
-    let x0_a = input[x0_idx][3];
-    let x1_r = input[x1_idx][0];
-    let x1_g = input[x1_idx][1];
-    let x1_b = input[x1_idx][2];
-    let x1_a = input[x1_idx][3];
-    let y0_r = input[y0_idx][0];
-    let y0_g = input[y0_idx][1];
-    let y0_b = input[y0_idx][2];
-    let y0_a = input[y0_idx][3];
-    let y1_r = input[y1_idx][0];
-    let y1_g = input[y1_idx][1];
-    let y1_b = input[y1_idx][2];
-    let y1_a = input[y1_idx][3];
-    let x_lerp_f = F::cast_from(x_lerp) / F::cast_from(width);
-    let y_lerp_f = F::cast_from(y_lerp) / F::cast_from(height);
-    let r = x0_r * (F::new(1.0) - x_lerp_f) * (F::new(1.0) - y_lerp_f)
-        + x1_r * x_lerp_f * (F::new(1.0) - y_lerp_f)
-        + y0_r * (F::new(1.0) - x_lerp_f) * y_lerp_f
-        + y1_r * x_lerp_f * y_lerp_f;
-    let g = x0_g * (F::new(1.0) - x_lerp_f) * (F::new(1.0) - y_lerp_f)
-        + x1_g * x_lerp_f * (F::new(1.0) - y_lerp_f)
-        + y0_g * (F::new(1.0) - x_lerp_f) * y_lerp_f
-        + y1_g * x_lerp_f * y_lerp_f;
-    let b = x0_b * (F::new(1.0) - x_lerp_f) * (F::new(1.0) - y_lerp_f)
-        + x1_b * x_lerp_f * (F::new(1.0) - y_lerp_f)
-        + y0_b * (F::new(1.0) - x_lerp_f) * y_lerp_f
-        + y1_b * x_lerp_f * y_lerp_f;
-    let a = x0_a * (F::new(1.0) - x_lerp_f) * (F::new(1.0) - y_lerp_f)
-        + x1_a * x_lerp_f * (F::new(1.0) - y_lerp_f)
-        + y0_a * (F::new(1.0) - x_lerp_f) * y_lerp_f
-        + y1_a * x_lerp_f * y_lerp_f;
-    output[(y_lerp * width + x_lerp) * 4] = r;
-    output[(y_lerp * width + x_lerp) * 4 + 1] = g;
-    output[(y_lerp * width + x_lerp) * 4 + 2] = b;
-    output[(y_lerp * width + x_lerp) * 4 + 3] = a;
-}
 
 #[cube(launch_unchecked)]
 pub fn resize_scaleup_kernel<F: Float>(
@@ -85,32 +27,67 @@ pub fn resize_scaleup_kernel<F: Float>(
     new_height: u32,
     output: &mut Array<F>,
 ) {
-    let i_width = width as i32;
-    let i_height = height as i32;
-    let width_scale = new_width as f32 / width as f32;
-    let height_scale = new_height as f32 / height as f32; 
+    let width_f = F::cast_from(width);
+    let height_f = F::cast_from(height);
+    let new_width_f = F::cast_from(new_width);
+    let new_height_f = F::cast_from(new_height);
+    let width_u = width as u32;
+
     for x in 0..CUBE_CLUSTER_DIM_X {
-        let px = ABSOLUTE_POS_X + x; // 자기 순회 x좌표...
+        let px = ABSOLUTE_POS_X + x;
         for y in 0..CUBE_CLUSTER_DIM_Y {
-            let py = ABSOLUTE_POS_Y + y; // 자기 순회 y좌표...
+            let py = ABSOLUTE_POS_Y + y;
 
-            let output_index = (py * new_width + px) * 4; // 출력 이미지에서의 인덱스
+            if px < new_width && py < new_height {
+                // Calculate corresponding coordinates in the original image
+                let original_x_f = (F::cast_from(px) + F::new(0.5)) * width_f / new_width_f - F::new(0.5);
+                let original_y_f = (F::cast_from(py) + F::new(0.5)) * height_f / new_height_f - F::new(0.5);
 
-            for x_delta in -1..=1 {
-                for y_delta in -1..=1 {
-                    // Ensure we don't go out of bounds
-                    let x_lerp = ((px as f32 + x_delta as f32) * width_scale) as u32;
-                    let y_lerp = ((py as f32 + y_delta as f32) * height_scale) as u32;
-                    // let input_index = (px * width + py);
-                    // Perform bilinear interpolation
-                    bilinear_interpolate::<F>(
-                        input,
-                        px + x_delta as u32,
-                        py + y_delta as u32,
-                        x_lerp,
-                        y_lerp,
-                        output
-                    );
+                // Get integer coordinates and fractional parts for interpolation
+                let x0 = F::floor(original_x_f);
+                let y0 = F::floor(original_y_f);
+                let tx = original_x_f - x0;
+                let ty = original_y_f - y0;
+
+                let x0_u = u32::cast_from(x0);
+                let y0_u = u32::cast_from(y0);
+                
+                // Clamp coordinates to be within bounds
+                let x1_u = if x0_u + 1 < width - 1 {
+                    x0_u + 1
+                } else {
+                    width - 1
+                };
+                let y1_u = if y0_u + 1 < height - 1 {
+                    y0_u + 1
+                } else {
+                    height - 1
+                };
+                let x0_clamped_u = x0_u;
+                let y0_clamped_u = y0_u;
+
+                // Get the four surrounding pixels (c00, c10, c01, c11)
+                let c00_idx = y0_clamped_u * width_u + x0_clamped_u;
+                let c10_idx = y0_clamped_u * width_u + x1_u;
+                let c01_idx = y1_u * width_u + x0_clamped_u;
+                let c11_idx = y1_u * width_u + x1_u;
+
+                let new_idx = (py * new_width + px) * 4;
+
+                // Interpolate for each channel (R, G, B, A)
+                for i in 0..4 {
+                    let c00 = input[c00_idx][i];
+                    let c10 = input[c10_idx][i];
+                    let c01 = input[c01_idx][i];
+                    let c11 = input[c11_idx][i];
+
+                    // Lerp horizontally
+                    let top_lerp = c00 * (F::new(1.0) - tx) + c10 * tx;
+                    let bottom_lerp = c01 * (F::new(1.0) - tx) + c11 * tx;
+
+                    // Lerp vertically
+                    let final_val = top_lerp * (F::new(1.0) - ty) + bottom_lerp * ty;
+                    output[new_idx + i] = final_val;
                 }
             }
         }
@@ -181,8 +158,8 @@ fn launch<T: Runtime>(
     } else {
         thread_count as u32
     };
-    let block_x = (original_image.get_size().width as u32) / thread_x;
-    let block_y = (original_image.get_size().height as u32) / thread_y;
+    let block_x = (new_width as u32) / thread_x;
+    let block_y = (new_height as u32) / thread_y;
 
     println!("Launching resize with runtime: {}x{}", new_width, new_height);
     println!("Threads: {}x{}", thread_x, thread_y);
