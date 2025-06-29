@@ -25,4 +25,4 @@ applyTo: '**'
 > channel_idx는 0(R), 1(G), 2(B), 3(A)로 고정되어 있습니다.
 - `f32`, `i32`, `u32`, `bool` 타입을 사용합니다.
 - 이때, `f32` -> `u32`/`i32` 로 변환할 때는 `u32::cast_from`/`i32::cast_from` 을 써야 하고, `u32` <-> `i32` 변환은 as 키워드를 사용합니다.
-- array의 index에 접근 할 때에는 `usize`가 아닌, `u32`를 사용합니다.
+- GPU Kernel에서 array의 index에 접근 할 때에는 `usize`가 아닌, `u32`를 사용합니다.
