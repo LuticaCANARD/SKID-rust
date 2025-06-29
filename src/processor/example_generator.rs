@@ -1,4 +1,4 @@
-use cubecl::{cube, prelude::{Array, ArrayArg, Float, ScalarArg, ABSOLUTE_POS_X, ABSOLUTE_POS_Y, CUBE_CLUSTER_DIM_X, CUBE_CLUSTER_DIM_Y}, CubeCount, CubeDim, Runtime,frontend::*};
+use cubecl::{cube, prelude::{Array, ArrayArg, Float, ScalarArg, ABSOLUTE_POS_X, ABSOLUTE_POS_Y, CUBE_CLUSTER_DIM_X, CUBE_CLUSTER_DIM_Y}, CubeCount, CubeDim, Runtime,CubeElement,frontend::*};
 
 use crate::model::{skid_color::SKIDColor, skid_image::{SKIDImage, SKIDSizeVector2}};
 

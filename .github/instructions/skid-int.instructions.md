@@ -23,5 +23,6 @@ applyTo: '**'
 - cubecl 커널에서 입력값에 접근할 때는 이 1차원 배열을 (픽셀 인덱스, 채널 인덱스) 2단계로 접근합니다 (예: `input[pixel_idx][channel_idx]`).
 - 출력값에 쓰기 위해 접근할 때에는 1차원으로 좁혀서 접근합니다.(예: `output[pixel_idx * 4 + channel_idx]`)
 > channel_idx는 0(R), 1(G), 2(B), 3(A)로 고정되어 있습니다.
-
-
+- `f32`, `i32`, `u32`, `bool` 타입을 사용합니다.
+- 이때, `f32` -> `u32`/`i32` 로 변환할 때는 `u32::cast_from`/`i32::cast_from` 을 써야 하고, `u32` <-> `i32` 변환은 as 키워드를 사용합니다.
+- array의 index에 접근 할 때에는 `usize`가 아닌, `u32`를 사용합니다.
