@@ -105,23 +105,21 @@ fn resize_scaledown_kernel<F: Float>(
     new_height: u32,
     output: &mut Array<F>,
 ) {
+    //new_width < width && new_height < height 인 경우에만 작동합니다.
+    let width_f = F::cast_from(width);
+    let height_f = F::cast_from(height);
+    let new_width_f = F::cast_from(new_width);
+    let new_height_f = F::cast_from(new_height);
+    let width_u = width as u32;
+    let height_u = height as u32;
+
     for x in 0..CUBE_CLUSTER_DIM_X {
         let px = ABSOLUTE_POS_X + x;
         for y in 0..CUBE_CLUSTER_DIM_Y {
             let py = ABSOLUTE_POS_Y + y;
             if px < new_width && py < new_height {
-                // Calculate corresponding coordinates in the original (larger) image
-                // using nearest-neighbor.
-                let original_x = (px * width) / new_width;
-                let original_y = (py * height) / new_height;
-
-                let original_idx = (original_y * width + original_x) * 4;
                 let new_idx = (py * new_width + px) * 4;
 
-                // Copy the pixel value (all 4 channels) from input to output
-                for i in 0..4 {
-                    output[new_idx + i] = input[original_idx + i];
-                }
             }
         }
     }

@@ -17,28 +17,13 @@ static DEFAULT_COLOR: SKIDColor = SKIDColor {
     a: 0.0,
 };
 
-pub fn export_to_png(
-    image: &SKIDImage,
-    file_path: &str,
-    thread_count: Option<usize>,
-) -> Result<(), String> {
-    // 최적화 방향:
-    // 1. 각 스레드가 자신의 결과를 별도의 버퍼에 저장하고, 마지막에 합치기만 하도록 Mutex 사용 최소화
-    // 2. Arc<Mutex<>> 대신 Arc<Vec<...>>로 각 스레드가 독립적으로 작업
-    // 3. clone 대신 참조만 사용 (가능하다면)
-    // 4. 불필요한 unwrap_or, get 등 제거
-
-    let file = File::create(file_path).map_err(|e| e.to_string())?;
-    let mut writer = BufWriter::new(file);
-    let size = image.get_size();
-    let width = size.width;
-    let height = size.height;
-    let num_threads = thread_count.unwrap_or(4);
-    let rows_per_thread = (height + num_threads - 1) / num_threads;
-
-    // 최종 픽셀 데이터를 담을 2차원 벡터 (스레드별로 분할)
-    let origin_image = Arc::new(image.get_data().clone());
-
+fn get_u16_color_vectors(
+    width: usize,
+    height: usize,
+    origin_image: Arc<Vec<Vec<SKIDColor>>>,
+    num_threads: usize,
+    rows_per_thread: usize,
+) -> Vec<Vec<[u16; 4]>> {
     let mut handles = Vec::new();
     let start = std::time::Instant::now();
     for thread_idx in 0..num_threads {
@@ -77,7 +62,37 @@ pub fn export_to_png(
         let buffer = handle.join().unwrap();
         rows.extend(buffer);
     }
+    rows
+}
 
+
+pub fn export_to_png(
+    image: &SKIDImage,
+    file_path: &str,
+    thread_count: Option<usize>,
+) -> Result<(), String> {
+    // 최적화 방향:
+    // 1. 각 스레드가 자신의 결과를 별도의 버퍼에 저장하고, 마지막에 합치기만 하도록 Mutex 사용 최소화
+    // 2. Arc<Mutex<>> 대신 Arc<Vec<...>>로 각 스레드가 독립적으로 작업
+    // 3. clone 대신 참조만 사용 (가능하다면)
+    // 4. 불필요한 unwrap_or, get 등 제거
+
+    let file = File::create(file_path).map_err(|e| e.to_string())?;
+    let mut writer = BufWriter::new(file);
+    let size = image.get_size();
+    let width = size.width;
+    let height = size.height;
+    let num_threads = thread_count.unwrap_or(4);
+    let rows_per_thread = (height + num_threads - 1) / num_threads;
+
+    let rows = get_u16_color_vectors(
+        width,
+        height,
+        Arc::new(image.get_data().clone()),
+        num_threads,
+        rows_per_thread,
+    );
+    let start = std::time::Instant::now();
     // 1차원 u16 벡터로 변환
     let flat: Vec<u16> = rows.into_iter()
         .flat_map(|row| row.into_iter().flat_map(|px| px))
@@ -226,4 +241,44 @@ pub fn import_from_png(file_path: &str,thread_count:Option<usize>) -> Result<SKI
 
 
     Ok(skid_image)
+}
+
+
+
+pub fn export_to_png_by_custom(
+    image: &SKIDImage,
+    file_path: &str,
+    thread_count: Option<usize>,
+    profile: Option<CompressionType>,
+) -> Result<(), String> {
+
+    let file = File::create(file_path).map_err(|e| e.to_string())?;
+    let mut writer = BufWriter::new(file);
+    let size = image.get_size();
+    let width = size.width;
+    let height = size.height;
+    let num_threads = thread_count.unwrap_or(4);
+    let rows_per_thread = (height + num_threads - 1) / num_threads;
+
+    // 최종 픽셀 데이터를 담을 2차원 벡터 (스레드별로 분할)
+    let origin_image = Arc::new(image.get_data().clone());
+
+    let rows = get_u16_color_vectors(
+        width,
+        height,
+        Arc::clone(&origin_image),
+        num_threads,
+        rows_per_thread,
+    );
+    // 1차원 u16 벡터로 변환
+    // u16을 u8 두 개로 분리하여 1차원 벡터로 변환 (길이 2배)
+    let flat: Vec<u8> = rows.into_iter()
+        .flat_map(|row| row.into_iter().flat_map(|px| {
+            px.iter().flat_map(|&v| v.to_le_bytes()).collect::<Vec<_>>() // [u16;4] -> [u8;8]
+        }))
+        .collect();
+
+    
+    Ok(())
+
 }
