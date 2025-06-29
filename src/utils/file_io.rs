@@ -10,12 +10,12 @@ use std::path::Path;
 
 
 // Define a static default color to avoid temporary borrow issues
-static DEFAULT_COLOR: SKIDColor = SKIDColor {
-    r: 0.0,
-    g: 0.0,
-    b: 0.0,
-    a: 0.0,
-};
+// static DEFAULT_COLOR: SKIDColor = SKIDColor {
+//     r: 0.0,
+//     g: 0.0,
+//     b: 0.0,
+//     a: 0.0,
+// };
 
 fn get_u16_color_vectors(
     width: usize,
@@ -37,11 +37,9 @@ fn get_u16_color_vectors(
 
         let handle = thread::spawn(move || {
             for (i, y) in (start_row..end_row).enumerate() {
-                let fallback_row = vec![DEFAULT_COLOR; width];
-
-                let now_row = origin_image.get(y).unwrap_or(&fallback_row);
+                let now_row = &origin_image[y];
                 for x in 0..width {
-                    let color = now_row.get(x).unwrap_or(&DEFAULT_COLOR);
+                    let color = now_row[x];
                     local_buffer[i][x] = [
                         (color.r * 65535.0) as u16,
                         (color.g * 65535.0) as u16,
@@ -54,7 +52,7 @@ fn get_u16_color_vectors(
         });
         handles.push(handle);
     }
-    println!("Thread spawn time: {:?}", start.elapsed());
+    // println!("Thread spawn time: {:?}", start.elapsed());
     // 스레드 결과 합치기
     let mut rows: Vec<Vec<[u16; 4]>> = Vec::with_capacity(height);
     for handle in handles {

@@ -49,8 +49,9 @@ pub fn resize_scaleup_kernel<F: Float>(
                 let tx = original_x_f - x0;
                 let ty = original_y_f - y0;
 
-                let x0_u = u32::cast_from(x0);
-                let y0_u = u32::cast_from(y0);
+                let x0_u = u32::cast_from(F::max(x0, F::new(0.)));  
+                let y0_u = u32::cast_from(F::max(y0, F::new(0.)));  
+
                 
                 // Clamp coordinates to be within bounds
                 let x1_u = if x0_u + 1 < width - 1 {
