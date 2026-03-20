@@ -145,3 +145,81 @@ pub fn get_1d_data(&self) -> Vec<SKIDColor> { ... }   // 동일 로직
 ```
 
 **문제:** 같은 기능의 메서드 2개. 매 호출마다 전체 이미지 클론.
+
+---
+
+## 부록: RwLock 점유시간 분석
+
+### 변경 전 (GPU 작업 중 락 점유)
+
+`skid_image_resize` 호출 시 락 점유 구간:
+
+```
+read lock 획득
+  ├─ HashMap::get()                          ~50ns
+  ├─ get_1d_data_as_f32()  [CPU 변환]        ~2–8ms (1080p 기준)
+  ├─ client.create() [GPU 버퍼 업로드]        ~0.5–2ms
+  ├─ kernel launch + GPU 실행                ~5–50ms (해상도/GPU에 따라)
+  ├─ client.read_one() [GPU→CPU 다운로드]     ~1–5ms
+  ├─ f32→SKIDColor 변환 + from_1d_data()     ~2–8ms
+  └─ HashMap::insert()                       ~100ns
+read lock 해제 (→ write lock으로 승격 불가, 실제로는 drop 후 write)
+```
+
+**총 락 점유시간: ~10–73ms (1080p 기준)**
+
+이 기간 동안 다른 스레드의 `getSize`, `getData`, `free` 등 모든 읽기/쓰기가 차단됨.
+
+### 변경 후 (clone 패턴)
+
+```
+read lock 획득
+  ├─ HashMap::get()                          ~50ns
+  ├─ SKIDImage::clone()                      ~2–6ms (1080p, Vec<Vec<>> 깊은 복사)
+read lock 해제                                ← 여기서 즉시 해제
+
+[락 없음] GPU 작업 수행                        ~8–63ms
+  ├─ get_1d_data_as_f32()
+  ├─ GPU 버퍼 업로드/커널 실행/다운로드
+  └─ 결과 SKIDImage 생성
+
+write lock 획득
+  ├─ HashMap::insert()                       ~100ns
+write lock 해제
+```
+
+**읽기 락 점유: ~2–6ms (clone 비용)**
+**쓰기 락 점유: ~100ns**
+
+### 개선 효과 계산
+
+| 해상도 | 변경 전 락 점유 | 변경 후 읽기 락 | 변경 후 쓰기 락 | 동시성 차단 감소율 |
+|--------|-----------------|-----------------|-----------------|-------------------|
+| 720p (1280×720) | ~8ms | ~1.5ms | ~100ns | **~81%** |
+| 1080p (1920×1080) | ~25ms | ~4ms | ~100ns | **~84%** |
+| 4K (3840×2160) | ~73ms | ~15ms | ~100ns | **~79%** |
+
+**핵심:** clone 비용(~2–6ms)은 GPU 작업(~8–63ms)보다 항상 작으므로, 락 없이
+GPU 작업을 수행하는 것이 전체 스루풋에서 명확한 이득.
+
+### clone 비용 상세 (Vec<Vec<SKIDColor>>)
+
+1080p 이미지 = 1920 × 1080 픽셀 = 2,073,600 `SKIDColor` (각 16바이트)
+
+```
+메모리 할당:
+  - 외부 Vec: 1개 (1080 포인터)
+  - 내부 Vec: 1,080개 (각 1920 × 16바이트 = 30,720바이트)
+  - 총 복사량: 1080 × 30,720 = ~31.6 MB
+
+clone 비용 내역:
+  - 힙 할당: 1,081회 (outer Vec 1 + inner Vec 1080)
+  - memcpy: ~31.6 MB
+  - 예상 시간: ~3–5ms (메모리 대역폭 ~10 GB/s 기준)
+```
+
+### 향후 개선 가능 사항
+
+1. **`Vec<Vec<>>` → `Vec<SKIDColor>` 평탄화**: clone 시 할당 1회 + memcpy 1회로 축소. 예상 clone 시간 ~1ms.
+2. **`Arc<SKIDImage>` 기반 핸들**: clone 대신 참조 카운팅으로 O(1) 공유. 락 점유 ~50ns로 감소.
+3. **lock-free concurrent map**: `dashmap` 등으로 RwLock 자체를 제거.

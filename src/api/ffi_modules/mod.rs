@@ -182,6 +182,11 @@ pub extern "C" fn skid_image_get_data_as_f32_array(
 }
 
 /// 이미지 리사이즈 함수 (핸들 기반)
+///
+/// 락 점유 최소화 패턴:
+///   1. read lock → clone → drop lock  (락 점유: clone 비용만큼)
+///   2. GPU 작업 수행                   (락 없음)
+///   3. write lock → insert → drop lock (락 점유: HashMap insert만큼)
 #[no_mangle]
 pub extern "C" fn skid_image_resize(
     handle: u64,
@@ -191,22 +196,28 @@ pub extern "C" fn skid_image_resize(
     use cubecl::wgpu::WgpuRuntime;
 
     let device = &*DEFAULT_WGPU_DEVICE;
-    let handles = IMAGE_HANDLES.read().unwrap();
-    if let Some(image) = handles.get(&handle) {
-        let new_size = SKIDSizeVector2 { width: new_width, height: new_height };
 
-        let resized_image = processor::resize_image::resize_image::<WgpuRuntime>(
-            device,
-            image,
-            new_size,
-            None,
-        );
+    // 1) 읽기 락: 이미지 clone 후 즉시 해제
+    let image_clone = {
+        let handles = IMAGE_HANDLES.read().unwrap();
+        match handles.get(&handle) {
+            Some(image) => image.clone(),
+            None => return 0,
+        }
+        // handles(RwLockReadGuard) 여기서 drop
+    };
 
-        drop(handles); // 읽기 락 해제 후 쓰기 락 획득
-        let new_handle = new_handle_id();
-        IMAGE_HANDLES.write().unwrap().insert(new_handle, Box::new(resized_image));
-        new_handle
-    } else {
-        0 // Invalid handle
-    }
+    // 2) 락 없이 GPU 작업 수행
+    let new_size = SKIDSizeVector2 { width: new_width, height: new_height };
+    let resized_image = processor::resize_image::resize_image::<WgpuRuntime>(
+        device,
+        &image_clone,
+        new_size,
+        None,
+    );
+
+    // 3) 쓰기 락: 결과 저장 후 즉시 해제
+    let new_handle = new_handle_id();
+    IMAGE_HANDLES.write().unwrap().insert(new_handle, Box::new(resized_image));
+    new_handle
 }

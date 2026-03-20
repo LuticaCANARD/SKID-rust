@@ -217,25 +217,32 @@ pub unsafe extern "C" fn Java_dev_lutica_skid_SKIDNative_resize(
     use super::ffi_modules::DEFAULT_WGPU_DEVICE;
 
     let device = &*DEFAULT_WGPU_DEVICE;
-    let handles = IMAGE_HANDLES.read().unwrap();
-    if let Some(image) = handles.get(&(handle as u64)) {
-        let new_size = SKIDSizeVector2 {
-            width: new_width as usize,
-            height: new_height as usize,
-        };
-        let resized = processor::resize_image::resize_image::<WgpuRuntime>(
-            device,
-            image,
-            new_size,
-            None,
-        );
-        drop(handles); // 읽기 락 해제 후 쓰기 락 획득
-        let new_handle = new_handle_id();
-        IMAGE_HANDLES.write().unwrap().insert(new_handle, Box::new(resized));
-        new_handle as JLong
-    } else {
-        0
-    }
+
+    // 1) 읽기 락: clone 후 즉시 해제
+    let image_clone = {
+        let handles = IMAGE_HANDLES.read().unwrap();
+        match handles.get(&(handle as u64)) {
+            Some(image) => image.clone(),
+            None => return 0,
+        }
+    };
+
+    // 2) 락 없이 GPU 작업
+    let new_size = SKIDSizeVector2 {
+        width: new_width as usize,
+        height: new_height as usize,
+    };
+    let resized = processor::resize_image::resize_image::<WgpuRuntime>(
+        device,
+        &image_clone,
+        new_size,
+        None,
+    );
+
+    // 3) 쓰기 락: 결과 저장
+    let new_handle = new_handle_id();
+    IMAGE_HANDLES.write().unwrap().insert(new_handle, Box::new(resized));
+    new_handle as JLong
 }
 
 /// 높이맵에서 노멀맵을 생성하고 새 핸들을 반환한다.
@@ -253,19 +260,26 @@ pub unsafe extern "C" fn Java_dev_lutica_skid_SKIDNative_generateNormalMap(
     use super::ffi_modules::DEFAULT_WGPU_DEVICE;
 
     let device = &*DEFAULT_WGPU_DEVICE;
-    let handles = IMAGE_HANDLES.read().unwrap();
-    if let Some(image) = handles.get(&(handle as u64)) {
-        let result = processor::make_normal_map::make_normal_map_base::<WgpuRuntime>(
-            device.clone(),
-            image,
-            Some(x_factor),
-            Some(y_factor),
-        );
-        drop(handles); // 읽기 락 해제 후 쓰기 락 획득
-        let new_handle = new_handle_id();
-        IMAGE_HANDLES.write().unwrap().insert(new_handle, Box::new(result));
-        new_handle as JLong
-    } else {
-        0
-    }
+
+    // 1) 읽기 락: clone 후 즉시 해제
+    let image_clone = {
+        let handles = IMAGE_HANDLES.read().unwrap();
+        match handles.get(&(handle as u64)) {
+            Some(image) => image.clone(),
+            None => return 0,
+        }
+    };
+
+    // 2) 락 없이 GPU 작업
+    let result = processor::make_normal_map::make_normal_map_base::<WgpuRuntime>(
+        device.clone(),
+        &image_clone,
+        Some(x_factor),
+        Some(y_factor),
+    );
+
+    // 3) 쓰기 락: 결과 저장
+    let new_handle = new_handle_id();
+    IMAGE_HANDLES.write().unwrap().insert(new_handle, Box::new(result));
+    new_handle as JLong
 }

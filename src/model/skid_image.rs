@@ -16,6 +16,7 @@ impl SKIDSizeVector2 {
         SKIDSizeVector2 { width: tuple.0, height: tuple.1 }
     }
 }
+#[derive(Clone)]
 pub struct SKIDImage {
     width: usize,
     height: usize,
