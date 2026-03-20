@@ -4,7 +4,22 @@ use cubecl::Runtime;
 use crate::model::{skid_image::{SKIDImage, SKIDSizeVector2}, skid_color::SKIDColor};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
-use std::sync::{Mutex};
+use std::sync::{Mutex, RwLock};
+
+#[cfg(feature = "use_wgpu")]
+use cubecl::wgpu::WgpuDevice;
+#[cfg(feature = "use_cuda")]
+use cubecl::cuda::CudaDevice;
+
+// ─── GPU 디바이스 싱글턴 ───
+// WgpuDevice 자체는 열거형 변수일 뿐이지만, CubeCL 내부의 ComputeRuntime이
+// client()를 통해 디바이스별 클라이언트를 캐싱한다.
+// 싱글턴으로 관리하여 동일 디바이스가 항상 동일 캐시 키로 조회되도록 보장.
+#[cfg(feature = "use_wgpu")]
+pub static DEFAULT_WGPU_DEVICE: Lazy<WgpuDevice> = Lazy::new(WgpuDevice::default);
+
+#[cfg(feature = "use_cuda")]
+pub static DEFAULT_CUDA_DEVICE: Lazy<CudaDevice> = Lazy::new(CudaDevice::default);
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -118,7 +133,7 @@ pub extern "C" fn skid_image_create_from_f32_array(
     let image = SKIDImage::from_1d_data(SKIDSizeVector2 { width, height }, colors);
 
     let handle_id = new_handle_id();
-    IMAGE_HANDLES.lock().unwrap().insert(handle_id, Box::new(image));
+    IMAGE_HANDLES.write().unwrap().insert(handle_id, Box::new(image));
     handle_id
 }
 
@@ -126,7 +141,7 @@ pub extern "C" fn skid_image_create_from_f32_array(
 #[no_mangle]
 pub extern "C" fn skid_image_free(handle: u64) {
     if handle != 0 {
-        IMAGE_HANDLES.lock().unwrap().remove(&handle);
+        IMAGE_HANDLES.write().unwrap().remove(&handle);
     }
 }
 
@@ -134,7 +149,7 @@ pub extern "C" fn skid_image_free(handle: u64) {
 #[no_mangle]
 pub extern "C" fn skid_image_get_size(handle: u64, out_size: *mut SKIDSizeVector2) -> i32 {
     if out_size.is_null() { return -1; }
-    let handles = IMAGE_HANDLES.lock().unwrap();
+    let handles = IMAGE_HANDLES.read().unwrap();
     if let Some(image) = handles.get(&handle) {
         unsafe { *out_size = image.get_size(); }
         0
@@ -151,7 +166,7 @@ pub extern "C" fn skid_image_get_data_as_f32_array(
     buffer_len: usize,
 ) -> i32 {
     if out_bytes.is_null() { return -1; }
-    let handles = IMAGE_HANDLES.lock().unwrap();
+    let handles = IMAGE_HANDLES.read().unwrap();
     if let Some(image) = handles.get(&handle) {
         let image_data = image.get_1d_data_as_f32();
         if image_data.len() > buffer_len {
@@ -173,26 +188,23 @@ pub extern "C" fn skid_image_resize(
     new_width: usize,
     new_height: usize,
 ) -> u64 {
-    // 런타임 및 디바이스를 가져오는 로직이 필요합니다.
-    // 이 예제에서는 WGPU 런타임을 전역적으로 관리한다고 가정합니다.
-    // let runtime = &crate::WGPU_RUNTIME; 
-    use cubecl::wgpu::{WgpuDevice, WgpuRuntime};
+    use cubecl::wgpu::WgpuRuntime;
 
-    let device = WgpuDevice::default(); // 기본 디바이스 가져오기
-    let mut handles = IMAGE_HANDLES.lock().unwrap();
+    let device = &*DEFAULT_WGPU_DEVICE;
+    let handles = IMAGE_HANDLES.read().unwrap();
     if let Some(image) = handles.get(&handle) {
         let new_size = SKIDSizeVector2 { width: new_width, height: new_height };
 
         let resized_image = processor::resize_image::resize_image::<WgpuRuntime>(
-            &device,
+            device,
             image,
             new_size,
             None,
         );
 
+        drop(handles); // 읽기 락 해제 후 쓰기 락 획득
         let new_handle = new_handle_id();
-        // MutexGuard가 살아있는 동안 새 핸들을 삽입합니다.
-        handles.insert(new_handle, Box::new(resized_image));
+        IMAGE_HANDLES.write().unwrap().insert(new_handle, Box::new(resized_image));
         new_handle
     } else {
         0 // Invalid handle

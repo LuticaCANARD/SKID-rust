@@ -67,15 +67,12 @@ let image = SKIDImage::from_1d_data(..., colors);  // 복사 2: Vec → Vec<Vec<
 
 ---
 
-### 6. GPU 호출마다 디바이스 재생성 — `api/ffi_modules/mod.rs:181`
+### 6. ~~GPU 호출마다 디바이스 재생성~~ — **해결됨**
 
-```rust
-let device = WgpuDevice::default();  // 매 호출마다 새 디바이스
-```
-
-**문제:** GPU 디바이스 초기화는 수십~수백ms. 리사이즈 호출마다 반복됨.
-
-**해결:** 전역 디바이스 싱글턴 또는 핸들 기반 디바이스 풀.
+`DEFAULT_WGPU_DEVICE` 싱글턴으로 교체 완료.
+참고: CubeCL `ComputeRuntime`이 내부적으로 `client()`를 디바이스 키별로 캐싱하므로,
+`WgpuDevice::default()` 자체는 열거형 생성일 뿐 실제 GPU 초기화 비용은 없었음.
+그러나 명시적 싱글턴이 의도를 더 명확히 전달하고 HashMap 룩업도 제거.
 
 ---
 

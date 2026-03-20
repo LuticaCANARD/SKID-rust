@@ -142,7 +142,7 @@ pub unsafe extern "C" fn Java_dev_lutica_skid_SKIDNative_createFromF32Array(
     );
 
     let handle = new_handle_id();
-    IMAGE_HANDLES.lock().unwrap().insert(handle, Box::new(image));
+    IMAGE_HANDLES.write().unwrap().insert(handle, Box::new(image));
     handle as JLong
 }
 
@@ -156,7 +156,7 @@ pub unsafe extern "C" fn Java_dev_lutica_skid_SKIDNative_free(
     handle: JLong,
 ) {
     if handle > 0 {
-        IMAGE_HANDLES.lock().unwrap().remove(&(handle as u64));
+        IMAGE_HANDLES.write().unwrap().remove(&(handle as u64));
     }
 }
 
@@ -170,7 +170,7 @@ pub unsafe extern "C" fn Java_dev_lutica_skid_SKIDNative_getSize(
     _class: JClass,
     handle: JLong,
 ) -> JLong {
-    let handles = IMAGE_HANDLES.lock().unwrap();
+    let handles = IMAGE_HANDLES.read().unwrap();
     if let Some(image) = handles.get(&(handle as u64)) {
         let size = image.get_size();
         // 상위 32비트: width, 하위 32비트: height
@@ -189,7 +189,7 @@ pub unsafe extern "C" fn Java_dev_lutica_skid_SKIDNative_getDataAsF32Array(
     _class: JClass,
     handle: JLong,
 ) -> JFloatArray {
-    let handles = IMAGE_HANDLES.lock().unwrap();
+    let handles = IMAGE_HANDLES.read().unwrap();
     if let Some(image) = handles.get(&(handle as u64)) {
         let data = image.get_1d_data_as_f32();
         let arr = new_float_array(env, data.len() as i32);
@@ -213,23 +213,25 @@ pub unsafe extern "C" fn Java_dev_lutica_skid_SKIDNative_resize(
     new_width: JInt,
     new_height: JInt,
 ) -> JLong {
-    use cubecl::wgpu::{WgpuDevice, WgpuRuntime};
+    use cubecl::wgpu::WgpuRuntime;
+    use super::ffi_modules::DEFAULT_WGPU_DEVICE;
 
-    let device = WgpuDevice::default();
-    let mut handles = IMAGE_HANDLES.lock().unwrap();
+    let device = &*DEFAULT_WGPU_DEVICE;
+    let handles = IMAGE_HANDLES.read().unwrap();
     if let Some(image) = handles.get(&(handle as u64)) {
         let new_size = SKIDSizeVector2 {
             width: new_width as usize,
             height: new_height as usize,
         };
         let resized = processor::resize_image::resize_image::<WgpuRuntime>(
-            &device,
+            device,
             image,
             new_size,
             None,
         );
+        drop(handles); // 읽기 락 해제 후 쓰기 락 획득
         let new_handle = new_handle_id();
-        handles.insert(new_handle, Box::new(resized));
+        IMAGE_HANDLES.write().unwrap().insert(new_handle, Box::new(resized));
         new_handle as JLong
     } else {
         0
@@ -247,20 +249,21 @@ pub unsafe extern "C" fn Java_dev_lutica_skid_SKIDNative_generateNormalMap(
     x_factor: JFloat,
     y_factor: JFloat,
 ) -> JLong {
-    use cubecl::wgpu::{WgpuDevice, WgpuRuntime};
+    use cubecl::wgpu::WgpuRuntime;
+    use super::ffi_modules::DEFAULT_WGPU_DEVICE;
 
-    let handles = IMAGE_HANDLES.lock().unwrap();
+    let device = &*DEFAULT_WGPU_DEVICE;
+    let handles = IMAGE_HANDLES.read().unwrap();
     if let Some(image) = handles.get(&(handle as u64)) {
-        let device = WgpuDevice::default();
         let result = processor::make_normal_map::make_normal_map_base::<WgpuRuntime>(
-            device,
+            device.clone(),
             image,
             Some(x_factor),
             Some(y_factor),
         );
-        drop(handles); // 락 해제 후 새 핸들 삽입
+        drop(handles); // 읽기 락 해제 후 쓰기 락 획득
         let new_handle = new_handle_id();
-        IMAGE_HANDLES.lock().unwrap().insert(new_handle, Box::new(result));
+        IMAGE_HANDLES.write().unwrap().insert(new_handle, Box::new(result));
         new_handle as JLong
     } else {
         0
