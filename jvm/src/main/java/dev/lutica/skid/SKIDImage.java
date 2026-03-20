@@ -1,9 +1,13 @@
 package dev.lutica.skid;
 
+import java.lang.ref.Cleaner;
+
 /**
  * SKIDImage의 자원 안전 래퍼.
  *
  * AutoCloseable을 구현하여 try-with-resources 패턴 사용 가능.
+ * try-with-resources를 사용하지 못한 경우, {@link java.lang.ref.Cleaner}가
+ * GC 시점에 네이티브 핸들을 해제하는 안전장치 역할을 한다.
  *
  * <pre>{@code
  * try (SKIDImage img = SKIDImage.fromPixels(pixels, 1920, 1080)) {
@@ -15,13 +19,33 @@ package dev.lutica.skid;
  */
 public class SKIDImage implements AutoCloseable {
 
+    private static final Cleaner CLEANER = Cleaner.create();
+
     private long handle;
+    private final Cleaner.Cleanable cleanable;
+
+    private static class NativeHandleCleaner implements Runnable {
+        private long handle;
+
+        NativeHandleCleaner(long handle) {
+            this.handle = handle;
+        }
+
+        @Override
+        public void run() {
+            if (handle != 0) {
+                SKIDNative.free(handle);
+                handle = 0;
+            }
+        }
+    }
 
     private SKIDImage(long handle) {
         if (handle == 0) {
             throw new IllegalStateException("Failed to create SKIDImage (handle=0)");
         }
         this.handle = handle;
+        this.cleanable = CLEANER.register(this, new NativeHandleCleaner(handle));
     }
 
     /**
@@ -92,11 +116,6 @@ public class SKIDImage implements AutoCloseable {
             SKIDNative.free(handle);
             handle = 0;
         }
-    }
-
-    @Override
-    protected void finalize() throws Throwable {
-        close();
-        super.finalize();
+        cleanable.clean();
     }
 }
