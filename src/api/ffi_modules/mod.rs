@@ -91,13 +91,13 @@ extern "C" fn skid_generate_normal_map(
 
 use crate::processor;
 
-// SKIDImage 인스턴스를 저장할 전역 핸들 관리자
-static IMAGE_HANDLES: Lazy<Mutex<HashMap<u64, Box<SKIDImage>>>> = Lazy::new(Default::default);
+// SKIDImage 인스턴스를 저장할 전역 핸들 관리자 (JNI 모듈과 공유)
+pub static IMAGE_HANDLES: Lazy<Mutex<HashMap<u64, Box<SKIDImage>>>> = Lazy::new(Default::default);
 // 고유 핸들 ID를 생성하기 위한 카운터
 static LAST_HANDLE_ID: Lazy<Mutex<u64>> = Lazy::new(|| Mutex::new(0));
 
-// 새 핸들 ID를 생성하는 헬퍼 함수
-fn new_handle_id() -> u64 {
+// 새 핸들 ID를 생성하는 헬퍼 함수 (JNI 모듈과 공유)
+pub fn new_handle_id() -> u64 {
     let mut id = LAST_HANDLE_ID.lock().unwrap();
     *id += 1;
     *id
