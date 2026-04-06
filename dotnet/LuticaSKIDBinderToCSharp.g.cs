@@ -100,6 +100,11 @@ namespace LuticaSKIDBinder
 
         /// <summary>
         ///  이미지 리사이즈 함수 (핸들 기반)
+        ///
+        ///  락 점유 최소화 패턴:
+        ///    1. read lock → clone → drop lock  (락 점유: clone 비용만큼)
+        ///    2. GPU 작업 수행                   (락 없음)
+        ///    3. write lock → insert → drop lock (락 점유: HashMap insert만큼)
         /// </summary>
         [DllImport(__DllName, EntryPoint = "skid_image_resize", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         internal static extern ulong skid_image_resize(ulong handle, nuint new_width, nuint new_height);

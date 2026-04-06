@@ -70,7 +70,7 @@ impl std::ops::Sub for SKIDColor {
             r: self.r - other.r,
             g: self.g - other.g,
             b: self.b - other.b,
-            a: self.a - other.g
+            a: self.a - other.a
         }
     }
 }
